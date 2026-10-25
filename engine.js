@@ -36,7 +36,7 @@
   /* ---------- answer checking ---------- */
   function letters(s) { return String(s).toUpperCase().replace(/[^A-Z]/g, ""); }
   function num(s) {
-    var m = String(s).replace(/,/g, "").match(/-?\d+(\.\d+)?/);
+    var m = String(s).replace(/,/g, "").replace(/[−–]/g, "-").replace(/-\s+(?=\d)/g, "-").match(/-?(?:\d+(?:\.\d+)?|\.\d+)/);
     return m ? parseFloat(m[0]) : NaN;
   }
   function segKey(s) { return letters(s).split("").sort().join(""); }
@@ -166,9 +166,159 @@
 
   Practice.algebra = { parse: parseAlg, same: samePoly, simplified: isSimplified };
 
+  // Number theory helpers that lesson files can use to build questions.
+  var NT = Practice.nt = {
+    isPrime: function (n) { if (n < 2) return false; for (var i = 2; i * i <= n; i++) if (n % i === 0) return false; return true; },
+    factors: function (n) { var o = []; for (var i = 1; i <= n; i++) if (n % i === 0) o.push(i); return o; },
+    pf: function (n) { var o = [], p = 2; while (n > 1) { while (n % p === 0) { o.push(p); n /= p; } p++; } return o; },
+    hcf: function () { var a = [].slice.call(arguments); return a.reduce(function (x, y) { while (y) { var t = y; y = x % y; x = t; } return x; }); },
+    lcm: function () { var a = [].slice.call(arguments); return a.reduce(function (x, y) { return x / NT.hcf(x, y) * y; }); },
+    multiples: function (n, k) { var o = []; for (var i = 1; i <= k; i++) o.push(n * i); return o; },
+    pfStr: function (n) { return NT.pf(n).join(" × "); },
+    pfPow: function (n) {
+      var c = {}, up = { 2: "²", 3: "³", 4: "⁴", 5: "⁵", 6: "⁶" };
+      NT.pf(n).forEach(function (p) { c[p] = (c[p] || 0) + 1; });
+      return Object.keys(c).map(function (p) { return p + (c[p] > 1 ? up[c[p]] : ""); }).join(" × ");
+    }
+  };
+  // Prime factorisation answers: "2 × 2 × 3", "2*2*3", "2x2x3", "2^2 × 3" or "2² × 3"
+  function checkFactors(field, raw) {
+    var sup = { "²": "^2", "³": "^3", "⁴": "^4", "⁵": "^5", "⁶": "^6" };
+    var s = String(raw).replace(/[²³⁴⁵⁶]/g, function (c) { return sup[c]; }).replace(/\s*\^\s*/g, "^").trim();
+    var toks = s.split(/\s*[×xX*·.]\s*|\s+/).filter(Boolean), list = [];
+    for (var i = 0; i < toks.length; i++) {
+      var m = toks[i].match(/^(\d+)(?:\^(\d+))?$/);
+      if (!m) return { ok: false, say: "Write it like 2 × 2 × 3 (you can type x or * for ×)." };
+      for (var k = 0; k < (m[2] ? +m[2] : 1); k++) list.push(+m[1]);
+    }
+    var prod = list.reduce(function (a, b) { return a * b; }, 1);
+    if (prod !== field.answer) return { ok: false, say: "Those multiply to " + prod + ", not " + field.answer + "." };
+    var bad = list.filter(function (x) { return !NT.isPrime(x); });
+    if (bad.length) return { ok: false, say: bad[0] === 1 ? "Leave out 1. Use only prime numbers." : bad[0] + " is not a prime number. Break it into smaller factors." };
+    return { ok: true };
+  }
+
+  // Fractions: "3/8". frac: one fraction (equal value accepted; den: required denominator; lowest: must be in lowest terms).
+  // equiv: a list of fractions equivalent to answer; count, mode "mul" (bigger denominators) or "div" (smaller).
+  function parseFrac(t) { var m = String(t).replace(/\s+/g, "").match(/^(-?\d+)\/(\d+)$/); return m && +m[2] ? [+m[1], +m[2]] : null; }
+  function fracG(a, b) { while (b) { var t = b; b = a % b; a = t; } return Math.abs(a); }
+  // parseAny: "7/4", "1 3/4" (or "1 and 3/4") or "2" -> [numerator, denominator]; .mixed holds [whole, num, den] for a mixed number.
+  function parseAny(t) {
+    t = String(t).trim().replace(/\s+/g, " ");
+    var m = t.match(/^(\d+)(?: | and )(\d+) ?\/ ?(\d+)$/);
+    if (m && +m[3]) { var r = [+m[1] * +m[3] + +m[2], +m[3]]; r.mixed = [+m[1], +m[2], +m[3]]; return r; }
+    if (/^-?\d+$/.test(t)) return [+t, 1];
+    return parseFrac(t);
+  }
+  function checkFrac(field, raw) {
+    var w = parseAny(field.answer), g = field.mixedOk ? parseAny(raw) : parseFrac(raw);
+    if (!g) return { ok: false, say: !field.mixedOk && parseAny(raw) && parseAny(raw).mixed ? "Write it as a fraction like 7/4, not as a mixed number."
+      : field.mixedOk ? "Write a fraction like 3/8 or a mixed number like 1 3/8." : "Write a fraction like 3/8 (numerator / denominator)." };
+    if (g[0] * w[1] !== w[0] * g[1]) {
+      var ms = field.mistakes || [];
+      for (var i = 0; i < ms.length; i++) { var m = parseAny(ms[i].answer); if (m && m[0] * g[1] === g[0] * m[1]) return { ok: false, say: ms[i].say }; }
+      return { ok: false };
+    }
+    if (field.den && g[1] !== field.den) return { ok: false, say: "That is equal, but use the denominator " + field.den + "." };
+    if (g.mixed) {
+      if (g.mixed[1] >= g.mixed[2]) return { ok: false, say: "That is equal, but the fraction part must be less than 1. Take out more wholes." };
+      if (field.lowest && fracG(g.mixed[1], g.mixed[2]) !== 1) return { ok: false, say: "That is equal, but write the fraction part in its lowest terms." };
+    } else if (field.lowest && fracG(g[0], g[1]) !== 1) return { ok: false, say: "That is equal, but write it in its lowest terms." };
+    return { ok: true };
+  }
+  // Fraction arithmetic for lesson files: values are [num, den] in lowest terms.
+  Practice.fr = (function () {
+    function red(a) { var g = fracG(a[0], a[1]) || 1; return [a[0] / g, a[1] / g]; }
+    var F = {
+      of: function (t) { return red(parseAny(t)); },
+      add: function (a, b) { return red([a[0] * b[1] + b[0] * a[1], a[1] * b[1]]); },
+      sub: function (a, b) { return red([a[0] * b[1] - b[0] * a[1], a[1] * b[1]]); },
+      mul: function (a, b) { return red([a[0] * b[0], a[1] * b[1]]); },
+      div: function (a, b) { return red([a[0] * b[1], a[1] * b[0]]); },
+      str: function (a) { return a[1] === 1 ? String(a[0]) : a[0] + "/" + a[1]; },
+      mixed: function (a) { return a[1] === 1 || a[0] < a[1] ? F.str(a) : Math.floor(a[0] / a[1]) + (a[0] % a[1] ? " " + a[0] % a[1] + "/" + a[1] : ""); },
+      isInt: function (a) { return a[1] === 1; }
+    };
+    // calc(id, "3 2/3 + 2 5/6 − 4 4/9", opts): a whole question with worked help.
+    // Operators: + − × ÷ and "of" (done first), then × ÷, then + −, left to right. opts: prompt, label, unit, answer (override).
+    F.calc = function (id, expr, opts) {
+      opts = opts || {};
+      var toks = expr.split(/ (\+|−|×|÷|of) /), vals = [], ops = [], help = [], anyMixed = false;
+      for (var i = 0; i < toks.length; i++) if (i % 2) ops.push(toks[i]); else { var v = parseAny(toks[i]); if (v.mixed) anyMixed = true; vals.push({ t: toks[i], v: red(v) }); }
+      var unred = toks.filter(function (t, i) { var f = !(i % 2) && parseFrac(t); return f && fracG(f[0], f[1]) > 1; });
+      if (unred.length) help.push({ text: "First reduce to lowest terms: " + unred.map(function (t) { return t + " = " + F.str(F.of(t)); }).join(", ") + "." });
+      var mixedOnes = vals.filter(function (x) { return / /.test(x.t); });
+      if (mixedOnes.length) help.push({ text: "Change the mixed numbers to improper fractions: " + mixedOnes.map(function (x) { return x.t + " = " + F.str(x.v); }).join(", ") + "." });
+      function step(a, op, b) {
+        var r, A = F.str(a), B = F.str(b), L, x, y;
+        if (op === "+" || op === "−") {
+          r = op === "+" ? F.add(a, b) : F.sub(a, b);
+          if (a[1] === b[1]) { var s0 = (op === "+" ? a[0] + b[0] : a[0] - b[0]) + "/" + a[1]; return { r: r, say: "Same denominators, so " + (op === "+" ? "add" : "subtract") + " the numerators: " + A + " " + op + " " + B + " = " + s0 + (F.str(r) !== s0 ? " = " + F.str(r) : "") + "." }; }
+          L = NT.lcm(a[1], b[1]); x = a[0] * L / a[1]; y = b[0] * L / b[1];
+          var n = op === "+" ? x + y : x - y;
+          return { r: r, say: "L.C.M. of " + a[1] + " and " + b[1] + " is " + L + ": " + A + " " + op + " " + B + " = " + x + "/" + L + " " + op + " " + y + "/" + L + " = " + n + "/" + L + (F.str(r) !== n + "/" + L ? " = " + F.str(r) : "") + "." };
+        }
+        if (op === "÷") { var rb = [b[1], b[0]]; r = F.mul(a, rb); return { r: r, say: "Dividing by " + B + " means multiplying by its reciprocal " + F.str(rb) + ": " + A + " × " + F.str(rb) + " = " + F.str(r) + "." }; }
+        r = F.mul(a, b);
+        return { r: r, say: A + " " + (op === "of" ? "of" : "×") + " " + B + " = (" + a[0] + " × " + b[0] + ")/(" + a[1] + " × " + b[1] + ") = " + F.str(r) + (op === "of" ? " (\"of\" means ×)" : "") + "." };
+      }
+      [["of"], ["×", "÷"], ["+", "−"]].forEach(function (level) {
+        for (var k = 0; k < ops.length;) {
+          if (level.indexOf(ops[k]) === -1) { k++; continue; }
+          var st = step(vals[k].v, ops[k], vals[k + 1].v);
+          help.push({ text: st.say });
+          vals.splice(k, 2, { t: F.str(st.r), v: st.r }); ops.splice(k, 1);
+        }
+      });
+      var res = vals[0].v, show = anyMixed || opts.showMixed ? F.mixed(res) : F.str(res), extra = !anyMixed && res[0] > res[1] && res[1] > 1 ? " = " + F.mixed(res) : "";
+      if (opts.answer != null) show = opts.answer;
+      if (opts.help) help = opts.help.map(function (t) { return { text: t }; });
+      var pre = anyMixed && !opts.help && opts.answer == null && F.str(res) !== show ? F.str(res) + " = " : "";
+      help.push({ text: "Answer: **" + (opts.pre || "") + pre + show + extra + (opts.unit ? " " + opts.unit : "") + "**." });
+      var part = F.isInt(res) ? { id: "v", label: opts.label || "", type: "number", answer: res[0] }
+        : { id: "v", label: opts.label || "", type: "frac", answer: show, lowest: true, mixedOk: true };
+      if (opts.unit) part.unit = opts.unit;
+      return { id: id, prompt: opts.prompt || "**" + expr + "**", parts: [part], help: help };
+    };
+    return F;
+  })();
+  // mixed: a mixed number typed "2 3/4" (whole number, space, proper fraction in lowest terms).
+  function checkMixed(field, raw) {
+    var t = String(raw).trim().replace(/\s+/g, " "), w = field.answer.split(/[ \/]/).map(Number), wv = [w[0] * w[2] + w[1], w[2]];
+    var f = parseFrac(t), m = t.match(/^(\d+)(?: | and )(\d+) ?\/ ?(\d+)$/);
+    if (f && !m) return f[0] * wv[1] === wv[0] * f[1] ? { ok: false, say: "That is equal, but write it as a mixed number, like " + field.answer + "." } : { ok: false };
+    if (/^\d+$/.test(t)) return { ok: false, say: "Don't forget the fraction part. Type it like 2 3/4." };
+    if (!m || !+m[3]) return { ok: false, say: "Type a mixed number like 2 3/4 (whole number, space, fraction)." };
+    var a = +m[1], b = +m[2], c = +m[3];
+    if ((a * c + b) * wv[1] !== wv[0] * c) return { ok: false };
+    if (b >= c) return { ok: false, say: "That is equal, but the fraction part must be less than 1. Take out more wholes." };
+    if (fracG(b, c) !== 1) return { ok: false, say: "That is equal, but write the fraction part in its lowest terms." };
+    return { ok: true };
+  }
+  function checkEquiv(field, raw) {
+    var w = parseFrac(field.answer), toks = String(raw).split(/[,;]|\s+(?=\d)/).map(function (x) { return x.trim(); }).filter(Boolean), seen = {};
+    var list = toks.map(parseFrac);
+    if (list.some(function (x) { return !x; })) return { ok: false, say: "Write the fractions like 2/4, 3/6, 4/8, with commas between them." };
+    for (var i = 0; i < list.length; i++) {
+      var g = list[i], key = g.join("/");
+      if (g[0] * w[1] !== w[0] * g[1]) return { ok: false, say: key + " is not equal to " + field.answer + "." };
+      if (g[0] === w[0] && g[1] === w[1]) return { ok: false, say: "Don't include " + field.answer + " itself. Write new fractions." };
+      if (seen[key]) return { ok: false, say: "You wrote " + key + " twice." };
+      if (field.mode === "div" && g[1] > w[1]) return { ok: false, say: "Use division: the new denominators should be smaller than " + w[1] + "." };
+      seen[key] = 1;
+    }
+    var n = field.count || 3;
+    if (list.length !== n) return { ok: false, say: "Write " + n + " fractions. You wrote " + list.length + "." };
+    if (field.mode === "mul") {
+      var want = []; for (var k = 2; k < n + 2; k++) want.push(w[0] * k + "/" + w[1] * k);
+      if (!want.every(function (x) { return seen[x]; })) return { ok: false, say: "These are equal, but the first three come from multiplying by 2, 3 and 4." };
+    }
+    return { ok: true };
+  }
+
   // Sets: "{1, 3, 5}", "1 3 5" or "a, e, i". Order does not matter; repeats get feedback.
   function setItems(s) {
-    s = String(s).replace(/[{}∅]/g, " ").replace(/\b(phi|empty)\b/gi, " ").trim();
+    s = String(s).replace(/[−–]/g, "-").replace(/[{}∅]/g, " ").replace(/\b(phi|empty)\b/gi, " ").trim();
     if (!s) return [];
     return s.split(/\s*[,;]\s*|\s+/).filter(Boolean).map(function (x) {
       x = x.toLowerCase(); return /^-?\d+(\.\d+)?$/.test(x) ? String(+x) : x;
@@ -195,6 +345,185 @@
     return { ok: false, say: "Some elements are missing. This set has " + want.length + (want.length === 1 ? " element" : " elements") + " and you wrote " + got.length + "." };
   }
 
+  // Points: "(2, -3)" with or without brackets. point: typed; plot: clicked on a grid. Answer is written "(2, -3)".
+  function parsePoint(t) {
+    var m = String(t).replace(/[−–]/g, "-").replace(/\s+/g, "").match(/^\(?(-?\d+(?:\.\d+)?)[,;](-?\d+(?:\.\d+)?)\)?$/);
+    return m ? [+m[1], +m[2]] : null;
+  }
+  Practice.parsePoint = parsePoint;
+  function checkPoint(field, raw) {
+    var g = parsePoint(raw), w = parsePoint(field.answer);
+    if (!g) return { ok: false, say: field.type === "plot" ? "Click on the grid to place the point." : "Write the point like (2, 3): x first, then y." };
+    if (g[0] === w[0] && g[1] === w[1]) return { ok: true };
+    var where = field.type === "plot" ? ("You placed (" + g[0] + ", " + g[1] + "). ").replace(/-/g, "−") : "";
+    if (g[0] === w[1] && g[1] === w[0]) return { ok: false, say: where + "You swapped x and y. Go across (x) first, then up or down (y)." };
+    if (g[0] === w[0]) return { ok: false, say: where + "The x-coordinate is right. Check the y-coordinate" + (g[1] === -w[1] ? ": up is +, down is −." : ".") };
+    if (g[1] === w[1]) return { ok: false, say: where + "The y-coordinate is right. Check the x-coordinate" + (g[0] === -w[0] ? ": right is +, left is −." : ".") };
+    return { ok: false, say: where ? where + "Start at O, go across for x, then up or down for y." : undefined };
+  }
+
+  /* ---------- decimals ---------- */
+  // Values are exact fractions [num, den] in lowest terms, so 0.1 + 0.2 is exactly 0.3.
+  Practice.dec = (function () {
+    var F = Practice.fr;
+    function p10(k) { return Math.pow(10, k); }
+    function of(s) {
+      s = String(s).replace(/[−–]/g, "-").replace(/,/g, "").trim();
+      var m = s.match(/^(-?)(\d*)\.?(\d*)$/);
+      if (!m || (m[2] === "" && m[3] === "")) return null;
+      var k = m[3].length, n = parseInt((m[2] || "0") + m[3], 10) * (m[1] ? -1 : 1);
+      return F.of(n + "/" + p10(k));
+    }
+    function dps(s) { var m = String(s).match(/\.(\d*)/); return m ? m[1].length : 0; }
+    function terminates(v) { var d = v[1]; while (d % 2 === 0) d /= 2; while (d % 5 === 0) d /= 5; return d === 1; }
+    // decimal string of a value (exact when it terminates, else rounded to `places`, default 4)
+    function str(v, places) {
+      var neg = v[0] < 0, n = Math.abs(v[0]), d = v[1], k = 0;
+      if (terminates(v)) { while (p10(k) % d) k++; } else k = places == null ? 4 : places;
+      var x = Math.round(n * p10(k) / d), s = String(x);
+      if (k) { while (s.length <= k) s = "0" + s; s = s.slice(0, -k) + "." + s.slice(-k); if (places == null || terminates(v)) s = s.replace(/\.?0+$/, ""); }
+      return (neg && x ? "−" : "") + s;
+    }
+    function pad(s, k) { s = String(s).replace("-", "−"); var have = dps(s); if (k <= have) return s; return (have ? s : s + ".") + new Array(k - have + 1).join("0"); }
+    function round(s, k) { var v = of(s), x = Math.round(Math.abs(v[0]) * p10(k) / v[1] + 1e-9) * (v[0] < 0 ? -1 : 1); var r = String(Math.abs(x)); while (r.length <= k) r = "0" + r; return (x < 0 ? "−" : "") + (k ? r.slice(0, -k) + "." + r.slice(-k) : r); }
+    function isPow10(v) { return v[1] === 1 && /^10+$/.test(String(v[0])); }
+    function zeros(v) { return String(v[0]).length - 1; }
+    var PL = ["", "1 place", "2 places", "3 places", "4 places", "5 places", "6 places"];
+    function step(a, op, b) {
+      var A = str(a), B = str(b), r, R, k;
+      if (op === "+" || op === "−") {
+        r = op === "+" ? F.add(a, b) : F.sub(a, b); R = str(r); k = Math.max(dps(A), dps(B));
+        if (!k) return { r: r, say: A + " " + op + " " + B + " = " + R + "." };
+        var pa = pad(A, k), pb = pad(B, k), pr = pad(R, k);
+        return { r: r, say: "Line up the decimal points" + (pa !== A || pb !== B ? " (give both " + k + " decimal place" + (k > 1 ? "s" : "") + ")" : "") + ": " + pa + " " + op + " " + pb + " = " + pr + (pr !== R ? " = " + R : "") + "." };
+      }
+      if (op === "×") {
+        r = F.mul(a, b); R = str(r);
+        if (isPow10(b) && dps(A)) return { r: r, say: "Multiplying by " + B + " moves the decimal point " + PL[zeros(b)] + " to the right: " + A + " × " + B + " = " + R + "." };
+        if (isPow10(a) && dps(B)) return { r: r, say: "Multiplying by " + A + " moves the decimal point " + PL[zeros(a)] + " to the right: " + A + " × " + B + " = " + R + "." };
+        var da = dps(A), db = dps(B);
+        if (!da && !db) return { r: r, say: A + " × " + B + " = " + R + "." };
+        var ia = A.replace(".", "").replace(/^(−?)0+(?=\d)/, "$1"), ib = B.replace(".", "").replace(/^(−?)0+(?=\d)/, "$1");
+        var ip = String(Math.abs(+ia.replace("−", "-") * +ib.replace("−", "-")));
+        return { r: r, say: "Multiply without the decimal points: " + ia + " × " + ib + " = " + ip + ". Count the decimal places: " + da + " + " + db + " = " + (da + db) + ", so " + A + " × " + B + " = " + pad(R, da + db) + (pad(R, da + db) !== R ? " = " + R : "") + "." };
+      }
+      // division
+      r = F.div(a, b); R = str(r);
+      var out = [], q = R;
+      if (!terminates(r)) q = str(r, 4) + "…";
+      if (isPow10(b)) return { r: r, say: "Dividing by " + B + " moves the decimal point " + PL[zeros(b)] + " to the left: " + A + " ÷ " + B + " = " + q + "." };
+      k = dps(B);
+      if (k) {
+        var A2 = str(F.mul(a, [p10(k), 1])), B2 = str(F.mul(b, [p10(k), 1]));
+        out.push("Make the divisor a whole number: multiply both numbers by " + p10(k) + ". " + A + " ÷ " + B + " = " + A2 + " ÷ " + B2 + ".");
+        out.push(A2 + " ÷ " + B2 + " = " + q + (dps(A2) ? " (the point in the answer goes above the point in " + A2 + ")" : "") + ". Check: " + q.replace("…", "") + " × " + B + (terminates(r) ? " = " + A : " ≈ " + A) + ".");
+        return { r: r, say: out.join(" ") };
+      }
+      if (dps(A)) return { r: r, say: "Divide as usual and put the point in the answer above the point in " + A + ": " + A + " ÷ " + B + " = " + q + ". Check: " + q.replace("…", "") + " × " + B + (terminates(r) ? " = " : " ≈ ") + A + "." };
+      return { r: r, say: A + " ÷ " + B + " = " + q + "." };
+    }
+    // Evaluates "2 × (0.4 + 0.3)", "{2.5 × (4.3 − 3.4) ÷ (1.5)²} + 0.1" step by step.
+    function evaluate(expr) {
+      var toks = String(expr).replace(/-/g, "−").match(/\d*\.?\d+|[+−×÷(){}\[\]²]/g), steps = [], many = (toks.join("").match(/[+−×÷²]/g) || []).length > 1;
+      function solve(list, inBr) {
+        // list: tokens with no brackets, numbers as values
+        var vals = [], ops = [], tagged = {};
+        list.forEach(function (t, i) { if (i % 2) ops.push(t); else vals.push(t); });
+        [["×", "÷"], ["+", "−"]].forEach(function (lv, li) {
+          for (var k = 0; k < ops.length;) {
+            if (lv.indexOf(ops[k]) === -1) { k++; continue; }
+            var st = step(vals[k], ops[k], vals[k + 1]);
+            var tag = !many ? "" : inBr ? "Brackets first. " : li === 0 && ops.some(function (o) { return o === "+" || o === "−"; }) ? "× and ÷ before + and −. " : "";
+            if (tagged[tag]) tag = ""; else tagged[tag] = 1;
+            steps.push(tag + st.say);
+            vals.splice(k, 2, st.r); ops.splice(k, 1);
+          }
+        });
+        return vals[0];
+      }
+      var t = toks.map(function (x) { return /\d/.test(x) ? of(x) : x; });
+      var guard = 0;
+      while (guard++ < 50) {
+        var close = -1, open = -1;
+        for (var i = 0; i < t.length; i++) if (t[i] === ")" || t[i] === "}" || t[i] === "]") { close = i; break; }
+        // squares of plain numbers
+        for (var j = 0; j < t.length; j++) if (t[j] === "²" && Array.isArray(t[j - 1])) {
+          var v = t[j - 1], sq = F.mul(v, v); steps.push("Square: (" + str(v) + ")² = " + str(v) + " × " + str(v) + " = " + str(sq) + "."); t.splice(j - 1, 2, sq); j = 0;
+        }
+        if (close === -1) { for (i = 0; i < t.length; i++) if (t[i] === ")" || t[i] === "}" || t[i] === "]") { close = i; break; } }
+        if (close === -1) break;
+        for (i = close; i >= 0; i--) if (t[i] === "(" || t[i] === "{" || t[i] === "[") { open = i; break; }
+        var inner = t.slice(open + 1, close), val = inner.length === 1 ? inner[0] : solve(inner, true);
+        t.splice(open, close - open + 1, val);
+      }
+      var res = t.length === 1 ? t[0] : solve(t, false);
+      return { v: res, steps: steps };
+    }
+    // calc(id, "0.15 + 0.47", opts): a whole question with worked help.
+    // opts: prompt, label, unit, intro (step texts before), outro (after), dp (round the answer), answer (shown answer), pre (text before the answer), mistakes.
+    function calc(id, expr, opts) {
+      opts = opts || {};
+      var e = evaluate(expr), help = (opts.intro || []).map(function (s) { return { text: s }; });
+      e.steps.forEach(function (s) { help.push({ text: s }); });
+      var ans = opts.answer != null ? String(opts.answer) : opts.dp != null ? round(str(e.v, 8), opts.dp) : str(e.v);
+      if (opts.dp != null) help.push({ text: "Round to " + opts.dp + " decimal place" + (opts.dp > 1 ? "s" : "") + ": " + str(e.v, 6) + (terminates(e.v) ? "" : "…") + " ≈ " + ans + "." });
+      (opts.outro || []).forEach(function (s) { help.push({ text: s }); });
+      help.push({ text: "Answer: **" + (opts.pre || "") + ans + (opts.unit ? " " + opts.unit : "") + "**." });
+      var part = { id: "v", label: opts.label || "", type: "dec", answer: ans.replace("−", "-") };
+      if (opts.dp != null) { part.dp = opts.dp; part.round = str(e.v, 8); }
+      if (opts.unit) part.unit = opts.unit;
+      if (opts.mistakes) part.mistakes = opts.mistakes;
+      return { id: id, prompt: opts.prompt || "**" + expr + "**", parts: [part], help: help };
+    }
+    return { of: of, str: str, dps: dps, pad: pad, round: round, terminates: terminates, step: step, evaluate: evaluate, calc: calc };
+  })();
+  // dec: a decimal number. Options: dp (exact number of decimal places, for rounding), round (the unrounded value),
+  // fracOk (an equal fraction is fine too), tolerance, mistakes.
+  function checkDec(field, raw) {
+    var D = Practice.dec, s = String(raw).replace(/[−–]/g, "-").replace(/,/g, "").replace(/\s*\/\s*/g, "/");
+    var m = s.match(/-?(?:\d+\.\d*|\.\d+|\d+)(?:\/\d+)?/);
+    if (!m) return { ok: false, say: "Type a decimal number like 0.25." };
+    var tok = m[0].replace(/\.$/, ""), isFr = tok.indexOf("/") !== -1, g = isFr ? (parseFrac(tok) ? Practice.fr.of(tok) : null) : D.of(tok), w = D.of(field.answer);
+    if (!g) return { ok: false, say: "Type a decimal number like 0.25." };
+    var gv = g[0] / g[1], wv = w[0] / w[1], same = field.tolerance ? Math.abs(gv - wv) <= field.tolerance + 1e-12 : g[0] === w[0] && g[1] === w[1];
+    if (same) {
+      if (isFr && !field.fracOk) return { ok: false, say: "That is equal, but write it as a decimal, like " + field.answer + "." };
+      if (field.dp != null && !isFr && D.dps(tok) !== field.dp) return { ok: false, say: "Right value. To " + field.dp + " decimal place" + (field.dp > 1 ? "s" : "") + ", write exactly " + field.dp + " digit" + (field.dp > 1 ? "s" : "") + " after the point: " + field.answer + "." };
+      return { ok: true };
+    }
+    var ms = field.mistakes || [];
+    for (var i = 0; i < ms.length; i++) { var mv = D.of(ms[i].answer) || parseFrac(ms[i].answer); if (mv && Math.abs(mv[0] / mv[1] - gv) < 1e-12) return { ok: false, say: ms[i].say }; }
+    if (field.dp != null && field.round) {
+      var r = D.of(field.round), k = field.dp, tr = Math.floor(Math.abs(r[0]) * Math.pow(10, k) / r[1] + 1e-9) / Math.pow(10, k);
+      if (Math.abs(Math.abs(gv) - tr) < 1e-12) return { ok: false, say: "Look at the next digit after " + k + " decimal place" + (k > 1 ? "s" : "") + ". If it is 5 or more, round up." };
+      if (Math.abs(gv - r[0] / r[1]) < 1e-12 || D.dps(tok) > k) return { ok: false, say: "Round it: keep only " + k + " digit" + (k > 1 ? "s" : "") + " after the decimal point." };
+    }
+    if (gv && wv) { var ratio = Math.log(Math.abs(gv / wv)) / Math.LN10; if (Math.abs(ratio - Math.round(ratio)) < 1e-9 && Math.round(ratio) !== 0) return { ok: false, say: "The digits are right, but the decimal point is in the wrong place." }; }
+    return { ok: false };
+  }
+  // expand: expanded form of a decimal, e.g. 0.25 = 0.2 + 0.05 (or 2/10 + 5/100, or 2 × 0.1 + 5 × 0.01).
+  function checkExpand(field, raw) {
+    var D = Practice.dec, F = Practice.fr, w = D.of(field.answer), parts = String(raw).replace(/[−–]/g, "-").replace(/\s+/g, "").replace(/^.*=/, "").split("+").filter(Boolean);
+    if (parts.length < 2) return { ok: false, say: "Split it into place values, one part for each digit, joined with +." };
+    var sum = [0, 1], seen = {};
+    for (var i = 0; i < parts.length; i++) {
+      var p = parts[i].replace(/[()]/g, ""), fs = p.split(/[×x*]/), v = [1, 1];
+      for (var j = 0; j < fs.length; j++) { var f = fs[j].indexOf("/") !== -1 ? parseFrac(fs[j]) : D.of(fs[j]); if (!f) return { ok: false, say: "I can't read \"" + parts[i] + "\". Write parts like 0.2 + 0.05 or 2/10 + 5/100." }; v = F.mul(v, F.of(f[0] + "/" + f[1])); }
+      var lg = Math.log(v[1]) / Math.LN10, k = Math.round(lg);
+      if (v[0] === 0) continue;
+      if (v[1] !== Math.pow(10, k) && v[1] !== 1 || v[0] > 9 || v[0] < 1) {
+        // allow e.g. 5/1000 reduced to 1/200: rebuild with a power of ten
+        var ok2 = false;
+        for (k = 0; k <= 8; k++) { var n = v[0] * Math.pow(10, k) / v[1]; if (Math.abs(n - Math.round(n)) < 1e-9 && Math.round(n) >= 1 && Math.round(n) <= 9) { ok2 = true; break; } }
+        if (!ok2) return { ok: false, say: "\"" + parts[i] + "\" is not one place value. Each part should be one digit in its place, like 0.4 or 7/100." };
+      } else if (v[1] === 1) k = 0;
+      if (seen[k]) return { ok: false, say: "Two parts are in the same place. Use one part for each place." };
+      seen[k] = 1; sum = F.add(sum, v);
+    }
+    if (sum[0] * w[1] !== w[0] * sum[1]) return { ok: false, say: "Your parts add up to " + D.str(sum) + ", not " + field.answer + "." };
+    return { ok: true };
+  }
+
   // Returns {ok:boolean, say?:string}
   Practice.check = function (field, raw) {
     var t = field.type || "text";
@@ -202,7 +531,7 @@
     var ok = false;
     if (t === "number") {
       var v = num(raw), tol = field.tolerance || 0;
-      ok = !isNaN(v) && Math.abs(v - field.answer) <= tol;
+      ok = !isNaN(v) && [field.answer].concat(field.alt || []).some(function (a) { return Math.abs(v - a) <= tol + 1e-9; });
       if (!ok && field.mistakes) for (var i = 0; i < field.mistakes.length; i++) {
         var m = field.mistakes[i];
         if (Math.abs(v - m.answer) <= tol) return { ok: false, say: m.say };
@@ -211,6 +540,20 @@
       return checkExpr(field, raw);
     } else if (t === "set") {
       return checkSet(field, raw);
+    } else if (t === "frac") {
+      return checkFrac(field, raw);
+    } else if (t === "point" || t === "plot") {
+      return checkPoint(field, raw);
+    } else if (t === "mixed") {
+      return checkMixed(field, raw);
+    } else if (t === "dec") {
+      return checkDec(field, raw);
+    } else if (t === "expand") {
+      return checkExpand(field, raw);
+    } else if (t === "equiv") {
+      return checkEquiv(field, raw);
+    } else if (t === "factors") {
+      return checkFactors(field, raw);
     } else if (t === "numeral") {
       // A number written with commas in the right places, e.g. "2,70,58,91,436" (Nepali) or "2,705,891,436" (International)
       var g = String(raw).replace(/\s+/g, ""), w = String(field.answer);
@@ -260,9 +603,35 @@
         focus: function () { btns[0] && btns[0].focus(); },
         mark: function (s) { group.dataset.state = s || ""; } };
     }
-    var ph = { number: "?", angleName: "e.g. ABC", segments: "e.g. AB, AC", set: "e.g. 1, 2, 3", numeral: "e.g. 1,23,456", text: "", expr: field.form === "exact" ? "" : "e.g. 3x^2 + 2y" }[t] || "";
+    if (t === "plot") {
+      var R = field.range || [-5, 5, -5, 5], picked = null;
+      var gsvg = Practice.figures.coord({ type: "coord", range: R });
+      gsvg.classList.add("plot-grid"); gsvg.setAttribute("tabindex", "0"); gsvg.setAttribute("aria-label", "Grid. Click to place the point, or use the arrow keys.");
+      var dot = svg("circle", { r: 5, class: "plot-dot", visibility: "hidden" }); gsvg.appendChild(dot);
+      var readout = el("span", { class: "plot-read", text: "Click on the grid to place the point." });
+      var box = el("div", { class: "plot-wrap" }, [gsvg, readout]);
+      function place(x, y) {
+        x = Math.max(R[0], Math.min(R[1], x)); y = Math.max(R[2], Math.min(R[3], y)); picked = [x, y];
+        dot.setAttribute("cx", gsvg._X(x)); dot.setAttribute("cy", gsvg._Y(y)); dot.setAttribute("visibility", "visible");
+        readout.textContent = ("Your point: (" + x + ", " + y + ")").replace(/-/g, "−"); box.dataset.state = "";
+      }
+      gsvg.addEventListener("click", function (e) {
+        var pt = gsvg.createSVGPoint(); pt.x = e.clientX; pt.y = e.clientY;
+        var q = pt.matrixTransform(gsvg.getScreenCTM().inverse());
+        place(Math.round(gsvg._x(q.x)), Math.round(gsvg._y(q.y)));
+      });
+      gsvg.addEventListener("keydown", function (e) {
+        var d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
+        if (d) { e.preventDefault(); var c = picked || [0, 0]; place(c[0] + d[0], c[1] + d[1]); }
+        else if (e.key === "Enter") { e.preventDefault(); onEnter && onEnter(); }
+      });
+      return { node: box, get: function () { return picked ? "(" + picked[0] + ", " + picked[1] + ")" : ""; },
+        set: function (v) { var p = parsePoint(v); if (p) place(p[0], p[1]); },
+        focus: function () { gsvg.focus(); }, mark: function (st) { box.dataset.state = st || ""; } };
+    }
+    var ph = { number: "?", angleName: "e.g. ABC", segments: "e.g. AB, AC", set: "e.g. 1, 2, 3", numeral: "e.g. 1,23,456", factors: "e.g. 2 × 2 × 3", frac: "e.g. 3/8", point: "e.g. (2, 3)", mixed: "e.g. 2 3/4", dec: "e.g. 0.25", expand: "e.g. 0.2 + 0.05", equiv: "e.g. 2/4, 3/6, 4/8", text: "", expr: field.form === "exact" ? "" : "e.g. 3x^2 + 2y" }[t] || "";
     var inp = el("input", { id: uid, type: "text", class: "inp inp-" + t, autocomplete: "off", spellcheck: "false",
-      inputmode: t === "number" ? "decimal" : undefined, placeholder: ph,
+      inputmode: t === "number" || t === "dec" ? "decimal" : undefined, placeholder: ph,
       onkeydown: function (e) { if (e.key === "Enter") { e.preventDefault(); onEnter && onEnter(); } },
       oninput: function () { wrap.dataset.state = ""; if (prev) prev.textContent = inp.value.trim() && /[\^*]/.test(inp.value) ? "= " + Practice.prettyAlg(inp.value) : ""; } });
     var prev = t === "expr" ? el("span", { class: "alg-prev", "aria-live": "polite" }) : null;
@@ -555,18 +924,252 @@
 
   // Table puzzle: { type: "grid", rows: [["+", "9", "?a"], ["6", "15", "?b"]] }. "?a" draws an empty box labelled a.
   Practice.figures.grid = function (spec) {
-    var R = spec.rows.length, C = spec.rows[0].length, cw = 56, chh = 44;
+    var R = spec.rows.length, C = spec.rows[0].length, cw = spec.cw || 56, chh = 44, cws = spec.cws || null;
+    if (cws) return gridVar(spec, cws, chh);
     var s = svg("svg", { class: "fig fig-grid", viewBox: "-2 -2 " + (C * cw + 4) + " " + (R * chh + 4), role: "img", "aria-label": "Number puzzle" });
     spec.rows.forEach(function (row, r) {
       row.forEach(function (v, c) {
-        var blank = String(v).charAt(0) === "?", head = r === 0 || c === 0;
-        s.appendChild(svg("rect", { x: c * cw, y: r * chh, width: cw, height: chh, class: "grid-cell" + (head ? " head" : "") + (blank ? " blank" : "") }));
-        s.appendChild(svg("text", { x: c * cw + cw / 2, y: r * chh + chh / 2, class: blank ? "grid-q" : "grid-t" }, blank ? String(v).slice(1) : v));
+        var blank = String(v).charAt(0) === "?", head = !spec.plain && (r === 0 || c === 0), wall = v === "#";
+        s.appendChild(svg("rect", { x: c * cw, y: r * chh, width: cw, height: chh, class: "grid-cell" + (head ? " head" : "") + (blank ? " blank" : "") + (wall ? " wall" : "") }));
+        if (!wall) s.appendChild(svg("text", { x: c * cw + cw / 2, y: r * chh + chh / 2, class: blank ? "grid-q" : "grid-t" }, blank ? String(v).slice(1) : v));
       });
     });
     return s;
   };
 
+  // Hundred grid: { type: "hgrid", cells: [[0, 7, "a"], [7, 35, "b"]], rects: [[c0, r0, c1, r1, "a"]], top: ["0.3", 0, 3], left: ["0.2", 0, 2] }
+  // cells shade squares in reading order (from, to); rects shade blocks of columns c0..c1 and rows r0..r1 (tone "c" is the darker overlap).
+  Practice.figures.hgrid = function (spec) {
+    var n = spec.n || 10, u = 20, W = n * u, ox = spec.left ? 44 : 4, oy = spec.top ? 30 : 4;
+    var s = svg("svg", { class: "fig fig-hgrid", viewBox: "0 0 " + (W + ox + 6) + " " + (W + oy + 6), role: "img", "aria-label": "Hundred square grid" });
+    s.style.maxWidth = spec.small ? "140px" : "260px";
+    var g = svg("g", { transform: "translate(" + ox + " " + oy + ")" });
+    (spec.cells || []).forEach(function (r) { for (var i = r[0]; i < r[1]; i++) g.appendChild(svg("rect", { x: (i % n) * u, y: Math.floor(i / n) * u, width: u, height: u, class: "shade tone-" + (r[2] || "a") })); });
+    (spec.rects || []).forEach(function (r) { g.appendChild(svg("rect", { x: r[0] * u, y: r[1] * u, width: (r[2] - r[0]) * u, height: (r[3] - r[1]) * u, class: "shade tone-" + (r[4] || "a") })); });
+    for (var i = 1; i < n; i++) {
+      g.appendChild(svg("line", { x1: i * u, y1: 0, x2: i * u, y2: W, class: "hg-line" }));
+      g.appendChild(svg("line", { x1: 0, y1: i * u, x2: W, y2: i * u, class: "hg-line" }));
+    }
+    g.appendChild(svg("rect", { x: 0, y: 0, width: W, height: W, class: "fb-box" }));
+    if (spec.top) { var a = spec.top[1] * u, b = spec.top[2] * u; g.appendChild(svg("path", { d: "M" + a + " -4 v-8 H" + b + " v8", class: "hg-brace" })); g.appendChild(svg("text", { x: (a + b) / 2, y: -17, class: "hg-lbl" }, spec.top[0])); }
+    if (spec.left) { var c = spec.left[1] * u, d = spec.left[2] * u; g.appendChild(svg("path", { d: "M-4 " + c + " h-8 V" + d + " h8", class: "hg-brace" })); g.appendChild(svg("text", { x: -16, y: (c + d) / 2, class: "hg-lbl end" }, spec.left[0])); }
+    s.appendChild(g);
+    return s;
+  };
+
+  // Arrow puzzle: { type: "flow", nodes: { s: [0, 0, "0.6"], a: [1, 0, "?a"] }, arrows: [["s", "a", "÷ 2"]] }
+  // Nodes sit on a grid (column, row); "?x" is an empty circle labelled x.
+  Practice.figures.flow = function (spec) {
+    var DX = 112, DY = 92, R = 25, maxc = 0, maxr = 0, P = {};
+    Object.keys(spec.nodes).forEach(function (k) { var v = spec.nodes[k]; P[k] = [v[0] * DX, v[1] * DY]; maxc = Math.max(maxc, v[0]); maxr = Math.max(maxr, v[1]); });
+    var s = svg("svg", { class: "fig fig-flow", viewBox: (-R - 30) + " " + (-R - 8) + " " + (maxc * DX + 2 * R + 40) + " " + (maxr * DY + 2 * R + 16), role: "img", "aria-label": "Arrow puzzle" });
+    (spec.arrows || []).forEach(function (a) {
+      var p = P[a[0]], q = P[a[1]], dx = q[0] - p[0], dy = q[1] - p[1], L = Math.sqrt(dx * dx + dy * dy), ux = dx / L, uy = dy / L;
+      var x1 = p[0] + ux * (R + 3), y1 = p[1] + uy * (R + 3), x2 = q[0] - ux * (R + 4), y2 = q[1] - uy * (R + 4);
+      s.appendChild(svg("line", { x1: f(x1), y1: f(y1), x2: f(x2), y2: f(y2), class: "flow-line" }));
+      s.appendChild(svg("path", { d: "M" + f(x2) + " " + f(y2) + " l" + f(-ux * 9 - uy * 5) + " " + f(-uy * 9 + ux * 5) + " M" + f(x2) + " " + f(y2) + " l" + f(-ux * 9 + uy * 5) + " " + f(-uy * 9 - ux * 5), class: "flow-line" }));
+      var mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      s.appendChild(svg("text", { x: f(dy ? mx + 8 : mx), y: f(dy ? my : my - 9), class: "flow-op" + (dy ? " side" : "") }, a[2]));
+    });
+    Object.keys(spec.nodes).forEach(function (k) {
+      var v = String(spec.nodes[k][2]), blank = v.charAt(0) === "?";
+      s.appendChild(svg("circle", { cx: P[k][0], cy: P[k][1], r: R, class: "tree-node" + (blank ? " blank" : "") }));
+      s.appendChild(svg("text", { x: P[k][0], y: P[k][1], class: blank ? "grid-q" : "grid-t" }, blank ? v.slice(1) : v));
+    });
+    return s;
+  };
+
+  // grid with its own width for each column: cws: [110, 70, 70]
+  function gridVar(spec, cws, chh) {
+    var W = cws.reduce(function (a, b) { return a + b; }, 0), R = spec.rows.length, xs = [0];
+    cws.forEach(function (w, i) { xs.push(xs[i] + w); });
+    var s = svg("svg", { class: "fig fig-grid", viewBox: "-2 -2 " + (W + 4) + " " + (R * chh + 4), role: "img", "aria-label": "Table" });
+    s.style.maxWidth = Math.min(W * 1.15, 640) + "px";
+    spec.rows.forEach(function (row, r) {
+      row.forEach(function (v, c) {
+        var blank = String(v).charAt(0) === "?", head = !spec.plain && (r === 0 || (c === 0 && !spec.noHeadCol));
+        s.appendChild(svg("rect", { x: xs[c], y: r * chh, width: cws[c], height: chh, class: "grid-cell" + (head ? " head" : "") + (blank ? " blank" : "") }));
+        s.appendChild(svg("text", { x: xs[c] + cws[c] / 2, y: r * chh + chh / 2, class: (blank ? "grid-q" : "grid-t") + (String(v).length > 7 ? " small" : "") }, blank ? String(v).slice(1) : v));
+      });
+    });
+    return s;
+  }
+
+  // Bar chart: { type: "bars", max: 100, step: 10, unit: "%", bars: [["Orange", 90, "a"], ["Potato", 70, "b"]], ylabel: "Water content", xlabel: "Fruits", values: false }
+  Practice.figures.bars = function (spec) {
+    var n = spec.bars.length, H = 220, BW = 46, GAP = 30, ox = 58, max = spec.max || 100, step = spec.step || 10, W = n * (BW + GAP) + GAP;
+    var s = svg("svg", { class: "fig fig-bars", viewBox: "0 0 " + (ox + W + 10) + " " + (H + 70), role: "img", "aria-label": "Bar graph" });
+    s.style.maxWidth = "520px";
+    var Y = function (v) { return 14 + H - v / max * H; };
+    for (var v = 0; v <= max; v += step) {
+      s.appendChild(svg("line", { x1: ox, y1: f(Y(v)), x2: ox + W, y2: f(Y(v)), class: "bar-grid" + (v === 0 ? " base" : "") }));
+      s.appendChild(svg("text", { x: ox - 6, y: f(Y(v)), class: "bar-num" }, v + (spec.unit || "")));
+    }
+    spec.bars.forEach(function (b, i) {
+      var x = ox + GAP + i * (BW + GAP);
+      s.appendChild(svg("rect", { x: x, y: f(Y(b[1])), width: BW, height: f(H - (Y(b[1]) - 14)), class: "shade tone-" + (b[2] || "a") + " bar" }));
+      s.appendChild(svg("text", { x: x + BW / 2, y: H + 30, class: "bar-lbl" }, b[0]));
+      if (spec.values) s.appendChild(svg("text", { x: x + BW / 2, y: f(Y(b[1]) - 8), class: "bar-lbl" }, b[1] + (spec.unit || "")));
+    });
+    if (spec.xlabel) s.appendChild(svg("text", { x: ox + W / 2, y: H + 54, class: "bar-lbl strong" }, spec.xlabel));
+    if (spec.ylabel) s.appendChild(svg("text", { x: 12, y: 14 + H / 2, class: "bar-lbl strong", transform: "rotate(-90 12 " + (14 + H / 2) + ")" }, spec.ylabel));
+    return s;
+  };
+
+  // Factor tree: { type: "ftree", root: { v: "18", kids: [{ v: "2" }, { v: "?a", kids: [{ v: "?b" }, { v: "3" }] }] } }
+  Practice.figures.ftree = function (spec) {
+    var R = 17, DX = 46, DY = 58, leaves = 0, depth = 0, nodes = [];
+    (function lay(n, d) {
+      depth = Math.max(depth, d);
+      if (!n.kids || !n.kids.length) { n.x = leaves++ * DX; }
+      else { n.kids.forEach(function (k) { lay(k, d + 1); }); n.x = (n.kids[0].x + n.kids[n.kids.length - 1].x) / 2; }
+      n.y = d * DY; nodes.push(n);
+    })(spec.root, 0);
+    var W = (leaves - 1) * DX + 2 * R + 8, H = depth * DY + 2 * R + 8;
+    var s = svg("svg", { class: "fig fig-ftree", viewBox: f(-R - 4) + " " + f(-R - 4) + " " + f(W) + " " + f(H), role: "img", "aria-label": "Factor tree" });
+    nodes.forEach(function (n) {
+      (n.kids || []).forEach(function (k, i) {
+        s.appendChild(svg("line", { x1: n.x, y1: n.y + R, x2: k.x, y2: k.y - R, class: "tree-line" }));
+        if (i > 0) s.appendChild(svg("text", { x: f((n.kids[i - 1].x + k.x) / 2), y: k.y, class: "tree-x" }, "×"));
+      });
+    });
+    nodes.forEach(function (n) {
+      var blank = String(n.v).charAt(0) === "?";
+      s.appendChild(svg("circle", { cx: n.x, cy: n.y, r: R, class: "tree-node" + (blank ? " blank" : "") }));
+      s.appendChild(svg("text", { x: n.x, y: n.y, class: blank ? "grid-q" : "grid-t" }, blank ? String(n.v).slice(1) : n.v));
+    });
+    return s;
+  };
+
+  // Number line with hops: { type: "nline", from: -10, to: 10, hops: [[0, 3], [3, 6]], big: [0, 6], dots: [6] }
+  Practice.figures.nline = function (spec) {
+    var a = spec.from == null ? -10 : spec.from, b = spec.to == null ? 10 : spec.to, U = 22, W = (b - a) * U, Y = 70;
+    var X = function (v) { return (v - a) * U; };
+    var s = svg("svg", { class: "fig fig-nline", viewBox: "-24 0 " + (W + 48) + " 104", role: "img", "aria-label": "Number line" });
+    s.appendChild(svg("line", { x1: -16, y1: Y, x2: W + 16, y2: Y, class: "nl-axis" }));
+    s.appendChild(svg("path", { d: "M" + (W + 18) + " " + Y + " l-8 -5 v10 z M-18 " + Y + " l8 -5 v10 z", class: "nl-head" }));
+    for (var v = a; v <= b; v++) {
+      s.appendChild(svg("line", { x1: X(v), y1: Y - 5, x2: X(v), y2: Y + 5, class: "nl-tick" }));
+      s.appendChild(svg("text", { x: X(v), y: Y + 18, class: "nl-num" + (v === 0 ? " zero" : "") }, String(v)));
+    }
+    function hop(p, q, big) {
+      var x1 = X(p), x2 = X(q), d = Math.abs(x2 - x1), h = big ? Math.min(58, 18 + d * 0.2) : Math.min(44, 10 + d * 0.18), mx = (x1 + x2) / 2, cls = "nl-hop" + (big ? " big" : "");
+      s.appendChild(svg("path", { d: "M" + x1 + " " + (Y - 4) + " Q" + mx + " " + (Y - 4 - 2 * h) + " " + x2 + " " + (Y - 4), class: cls }));
+      var ang = Math.atan2(2 * h, x2 - mx), L = 8, head = "";
+      [0.45, -0.45].forEach(function (t) { head += "M" + x2 + " " + (Y - 4) + " l" + f(-L * Math.cos(ang + t)) + " " + f(-L * Math.sin(ang + t)) + " "; });
+      s.appendChild(svg("path", { d: head, class: cls + " nl-arrow" }));
+    }
+    (spec.hops || []).forEach(function (h) { hop(h[0], h[1], false); });
+    if (spec.big) hop(spec.big[0], spec.big[1], true);
+    (spec.dots || []).forEach(function (d) { s.appendChild(svg("circle", { cx: X(d), cy: Y, r: 4, class: "nl-dot" })); });
+    return s;
+  };
+
+  // Fraction bar: { type: "fbar", parts: 8, shade: [[0, 3, "a"], [3, 5, "b"]], label: "3/8", count: 1 }
+  // shade runs from part index to part index; with count > 1 the bars are stacked and the indexes run on across them.
+  function clip(r, i, n) { var a = Math.max(r[0], i * n) - i * n, b = Math.min(r[1], (i + 1) * n) - i * n; return b > a ? [a, b] : null; }
+  Practice.figures.fbar = function (spec) {
+    var n = spec.parts, k = spec.count || 1, W = 300, H = 56, G = 12, w = W / n, TH = k * H + (k - 1) * G;
+    var s = svg("svg", { class: "fig fig-fbar", viewBox: "-4 -4 " + (W + 8) + " " + (TH + (spec.label ? 30 : 8)), role: "img", "aria-label": "Fraction bar" });
+    for (var j = 0; j < k; j++) {
+      var y = j * (H + G);
+      (spec.shade || []).forEach(function (r) {
+        var c = clip(r, j, n); if (!c) return;
+        s.appendChild(svg("rect", { x: f(c[0] * w), y: y, width: f((c[1] - c[0]) * w), height: H, class: "shade tone-" + (r[2] === "x" ? "a" : r[2] || "a") }));
+        if (r[2] === "x") for (var q = c[0]; q < c[1]; q++) {  // crossed-out parts
+          s.appendChild(svg("line", { x1: f(q * w + 6), y1: y + 6, x2: f((q + 1) * w - 6), y2: y + H - 6, class: "fb-x" }));
+          s.appendChild(svg("line", { x1: f((q + 1) * w - 6), y1: y + 6, x2: f(q * w + 6), y2: y + H - 6, class: "fb-x" }));
+        }
+      });
+      for (var i = 1; i < n; i++) s.appendChild(svg("line", { x1: f(i * w), y1: y, x2: f(i * w), y2: y + H, class: "fb-line" }));
+      s.appendChild(svg("rect", { x: 0, y: y, width: W, height: H, class: "fb-box" }));
+    }
+    if (spec.label) s.appendChild(svg("text", { x: W / 2, y: TH + 18, class: "venn-item" }, spec.label));
+    return s;
+  };
+  // Pie: { type: "pie", parts: 6, shade: [[0, 1, "a"]], label: "1/6", count: 1 }  (count > 1 draws circles side by side)
+  Practice.figures.pie = function (spec) {
+    var n = spec.parts, k = spec.count || 1, R = 60, D = 140, s = svg("svg", { class: "fig fig-pie", viewBox: "-66 -66 " + (132 + (k - 1) * D) + " " + (132 + (spec.label ? 24 : 0)), role: "img", "aria-label": "Fraction circle" });
+    if (k > 1) s.style.maxWidth = Math.min(150 * k, 520) + "px";
+    for (var j = 0; j < k; j++) {
+      var g = svg("g", { transform: "translate(" + j * D + " 0)" });
+      var P = function (q) { var a = (90 - q * 360 / n) * Math.PI / 180; return [f(R * Math.cos(a)), f(-R * Math.sin(a))]; };
+      (spec.shade || []).forEach(function (r0) {
+        var r = clip(r0, j, n); if (!r) return;
+        var a = P(r[0]), b = P(r[1]), big = (r[1] - r[0]) / n > 0.5 ? 1 : 0;
+        g.appendChild(svg("path", { d: (r[1] - r[0]) >= n ? "M0 -60 A60 60 0 1 1 0 60 A60 60 0 1 1 0 -60" : "M0 0 L" + a[0] + " " + a[1] + " A" + R + " " + R + " 0 " + big + " 1 " + b[0] + " " + b[1] + " Z", class: "shade tone-" + (r0[2] || "a") }));
+      });
+      g.appendChild(svg("circle", { cx: 0, cy: 0, r: R, class: "fb-box" }));
+      if (n > 1) for (var i = 0; i < n; i++) { var p = P(i); g.appendChild(svg("line", { x1: 0, y1: 0, x2: p[0], y2: p[1], class: "fb-line" })); }
+      s.appendChild(g);
+    }
+    if (spec.label) s.appendChild(svg("text", { x: (k - 1) * D / 2, y: 78, class: "venn-item" }, spec.label));
+    return s;
+  };
+
+  // Coordinate grid: { type: "coord", range: [-5, 5, -5, 5], points: { A: [2, 3] }, polys: [["P", "Q", "R", "S"]], open: [["E", "F"]] }
+  // polys are closed shapes joined in order; open are paths that are not closed. Points named with "_" are not labelled.
+  Practice.figures.coord = function (spec) {
+    var R = spec.range || [-5, 5, -5, 5], nx = R[1] - R[0], ny = R[3] - R[2], u = Math.min(30, 320 / Math.max(nx, ny)), P = 22;
+    var W = nx * u, H = ny * u, s = svg("svg", { class: "fig fig-coord", viewBox: (-P) + " " + (-P) + " " + (W + 2 * P) + " " + (H + 2 * P), role: "img", "aria-label": "Coordinate grid" });
+    function X(x) { return f((x - R[0]) * u); } function Y(y) { return f((R[3] - y) * u); }
+    s._X = X; s._Y = Y; s._x = function (px) { return px / u + R[0]; }; s._y = function (py) { return R[3] - py / u; };
+    s.appendChild(svg("rect", { x: -P, y: -P, width: W + 2 * P, height: H + 2 * P, fill: "transparent" }));
+    for (var x = R[0]; x <= R[1]; x++) s.appendChild(svg("line", { x1: X(x), y1: 0, x2: X(x), y2: H, class: "coord-grid" }));
+    for (var y = R[2]; y <= R[3]; y++) s.appendChild(svg("line", { x1: 0, y1: Y(y), x2: W, y2: Y(y), class: "coord-grid" }));
+    var step = u < 18 ? 2 : 1;
+    if (R[2] <= 0 && R[3] >= 0) {
+      s.appendChild(svg("line", { x1: -8, y1: Y(0), x2: W + 8, y2: Y(0), class: "coord-axis" }));
+      for (x = R[0]; x <= R[1]; x++) if (x && x % step === 0) s.appendChild(svg("text", { x: X(x), y: f(+Y(0) + 11), class: "coord-num" }, String(x).replace("-", "−")));
+      s.appendChild(svg("text", { x: W + 13, y: Y(0), class: "coord-name" }, "X")); s.appendChild(svg("text", { x: -14, y: Y(0), class: "coord-name" }, "X'"));
+    }
+    if (R[0] <= 0 && R[1] >= 0) {
+      s.appendChild(svg("line", { x1: X(0), y1: -8, x2: X(0), y2: H + 8, class: "coord-axis" }));
+      for (y = R[2]; y <= R[3]; y++) if (y && y % step === 0) s.appendChild(svg("text", { x: f(+X(0) - 9), y: Y(y), class: "coord-num" }, String(y).replace("-", "−")));
+      s.appendChild(svg("text", { x: X(0), y: -14, class: "coord-name" }, "Y")); s.appendChild(svg("text", { x: X(0), y: H + 14, class: "coord-name" }, "Y'"));
+      if (R[2] <= 0 && R[3] >= 0) s.appendChild(svg("text", { x: f(+X(0) - 8), y: f(+Y(0) + 11), class: "coord-num" }, "O"));
+    }
+    var pts = spec.points || {};
+    function path(names, closed) {
+      var d = names.map(function (n, i) { return (i ? "L" : "M") + X(pts[n][0]) + " " + Y(pts[n][1]); }).join(" ") + (closed ? " Z" : "");
+      s.appendChild(svg("path", { d: d, class: "coord-shape" }));
+    }
+    (spec.polys || []).forEach(function (p) { path(p, true); });
+    (spec.open || []).forEach(function (p) { path(p, false); s.lastChild.setAttribute("class", "coord-shape coord-open"); });
+    Object.keys(pts).forEach(function (n) {
+      var p = pts[n];
+      s.appendChild(svg("circle", { cx: X(p[0]), cy: Y(p[1]), r: 3.5, class: "coord-pt" }));
+      if (n.charAt(0) !== "_") s.appendChild(svg("text", { x: f(+X(p[0]) + 8), y: f(+Y(p[1]) - 8), class: "coord-lbl" }, n));
+    });
+    return s;
+  };
+  // Kinds of lines: { type: "lk", kind: "ray" | "line" | "segment" | "curve", a: "A", b: "B" }
+  Practice.figures.lk = function (spec) {
+    var s = svg("svg", { class: "fig fig-lk", viewBox: "0 0 160 70", role: "img", "aria-label": "A line" }), k = spec.kind;
+    var x1 = 25, y1 = 50, x2 = 135, y2 = 22;
+    if (k === "curve") s.appendChild(svg("path", { d: "M25 55 C 50 0, 110 0, 135 55", class: "lk-line" }));
+    else s.appendChild(svg("line", { x1: x1, y1: y1, x2: x2, y2: y2, class: "lk-line" }));
+    function head(x, y, dx, dy) { var L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L; s.appendChild(svg("path", { d: "M" + f(x) + " " + f(y) + " L" + f(x - 9 * ux - 5 * uy) + " " + f(y - 9 * uy + 5 * ux) + " L" + f(x - 9 * ux + 5 * uy) + " " + f(y - 9 * uy - 5 * ux) + " Z", class: "lk-head" })); }
+    if (k === "ray" || k === "line") head(x2, y2, x2 - x1, y2 - y1);
+    if (k === "line") head(x1, y1, x1 - x2, y1 - y2);
+    if (k === "ray" || k === "segment") s.appendChild(svg("circle", { cx: x1, cy: y1, r: 3.5, class: "lk-dot" }));
+    if (k === "segment") s.appendChild(svg("circle", { cx: x2, cy: y2, r: 3.5, class: "lk-dot" }));
+    s.appendChild(svg("text", { x: k === "curve" ? 25 : x1 - 6, y: k === "curve" ? 68 : y1 + 15, class: "coord-lbl" }, spec.a));
+    s.appendChild(svg("text", { x: k === "curve" ? 135 : x2 + 6, y: k === "curve" ? 68 : y2 - 8, class: "coord-lbl" }, spec.b));
+    return s;
+  };
+  // Row of small figures with signs between: { type: "row", items: [{ type: "fbar", ... }, "+", { type: "pie", ... }, "=", ...], caption?: ["1/2", "", "1/3"] }
+  Practice.figures.row = function (spec) {
+    var d = document.createElement("div"); d.className = "fig-row";
+    spec.items.forEach(function (it) {
+      if (typeof it === "string") { var o = document.createElement("span"); o.className = "fig-op"; o.textContent = it; d.appendChild(o); return; }
+      var cell = document.createElement("span"); cell.className = "fig-cell";
+      var f = renderFigure(it); if (f) cell.appendChild(f);
+      if (it.caption) { var c = document.createElement("span"); c.className = "fig-cap"; c.textContent = it.caption; cell.appendChild(c); }
+      d.appendChild(cell);
+    });
+    return d;
+  };
   function renderFigure(spec, opts) {
     var fn = spec && Practice.figures[spec.type];
     return fn ? fn(spec, opts || {}) : null;
@@ -863,7 +1466,7 @@
           }
         }
         function reveal(right) {
-          var shownAns = step.ask.type === "set" ? step.ask.answer.join(", ") : Array.isArray(step.ask.answer) ? step.ask.answer[0] : step.ask.answer;
+          var shownAns = step.ask.type === "factors" ? Practice.nt.pfStr(step.ask.answer) : step.ask.type === "set" ? step.ask.answer.join(", ") : Array.isArray(step.ask.answer) ? step.ask.answer[0] : step.ask.answer;
           inp.mark("ok"); inp.set(step.ask.type === "choice" ? shownAns : String(shownAns));
           cbtn.disabled = true; show.hidden = true;
           fb.className = "ask-fb good";
