@@ -66,6 +66,9 @@ Answer types (used in `parts` and in `ask`):
 | `text`      | `"O"`                 | case-insensitive; `accept: [...]` for other spellings. |
 | `angleName` | `"AOB"`               | accepts AOB or BOA, with or without ∠. |
 | `segments`  | `["OA", "OB"]`        | any order, either direction (OA = AO). |
+| `set`       | `["11", "13", "17"]`  | listing method. Any order; braces optional; spaces or commas. Repeated elements get "write each element only once". `[]` is the empty set (student types {} or ∅). `accept: [[...]]` for other right sets. |
+| `numeral`   | `"2,70,58,91,436"`    | a number with commas. Checks the commas are in the right places and explains the Nepali (3, then 2s) or International (3s) rule when they are not. |
+| `expr`      | `"3x^2+4y"`           | algebra. Accepts any equal answer written in simplest form (4y + 3x is fine; 2x + x + 4y gets "simplify fully"). `form: "any"` also accepts unsimplified forms such as 2(x + y). `form: "exact"` compares the text, e.g. `"2^2×3^2"` with `accept: [...]`. Students type powers with ^ (or ², ³). |
 
 Points: 10 per question, minus 2 per wrong check and 1 per help step opened (never below 3).
 
@@ -78,6 +81,8 @@ Points: 10 per question, minus 2 per wrong check and 1 per help step opened (nev
 - Sections can set `no: "11a"` to show their own question number.
   Extra geo options: `ticks: [["A", "B", 1]]` draws equal-side tick marks on AB; `circles: [{ at: "O", r: 90 }]` draws a circle; `shade: [{ at: "O", r: 90, from: 0, to: 50, kind: "sector" | "segment", tone: "a" | "b" }]` shades a sector or segment (degrees as for angles).
 - An `angle` figure can set `vertexDeg` to choose where the vertex letter goes.
+- `{ type: "venn", a: { name: "A", items: [...] }, b: { name: "B", items: [...] } }` draws a Venn diagram. Common items go in the overlap; disjoint sets are drawn apart; a subset is drawn inside. Optional `u: { name: "U", items: [...] }` adds a universal set box.
+- `{ type: "grid", rows: [["+", "9", "?a"], ["6", "15", "?b"]] }` draws a table puzzle; a cell starting with `?` is an empty box labelled with the rest of the text.
 - `{ type: "clock", sweep: 15 }` draws a clock; `sweep` shades that many minutes from 12.
 
 New drawing types for other subjects can be added in `engine.js` as `Practice.figures.myType = function (spec) { return svgElement; }`.
