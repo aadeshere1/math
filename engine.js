@@ -197,6 +197,7 @@
     if (spec.vertex) {
       var ang = Math.hypot(vx, vy) < 0.3 ? 225 : Math.atan2(vy, vx) * 180 / Math.PI + 180;
       if (prot) ang = prot.base + 270; // below the protractor's straight edge
+      if (spec.vertexDeg != null) ang = spec.vertexDeg;
       // keep the vertex letter clear of any curved angle mark that covers its direction
       var vr = 14;
       (spec.arcs || []).forEach(function (arc) {
@@ -228,6 +229,24 @@
       var t = ((a.x - c.x) * (c.y - d.y) - (a.y - c.y) * (c.x - d.x)) / den;
       P[k] = { x: a.x + t * (b.x - a.x), y: a.y + t * (b.y - a.y), lab: (spec.meetLab || {})[k] };
     });
+    // circles: [{ at: "O", r: 90 }]; shade: [{ at: "O", r: 90, from: 0, to: 50, kind: "sector" | "segment", tone: "a" | "b" }]
+    (spec.shade || []).forEach(function (sh) {
+      var c = P[sh.at], r = sh.r, a = pt(sh.from, r), b = pt(sh.to, r), sw = ((sh.to - sh.from) % 360 + 360) % 360;
+      var arc = "A" + r + " " + r + " 0 " + (sw > 180 ? 1 : 0) + " 0 " + f(c.x + b[0]) + " " + f(c.y + b[1]);
+      var d = sh.kind === "segment" ? "M" + f(c.x + a[0]) + " " + f(c.y + a[1]) + " " + arc + " Z"
+        : "M" + f(c.x) + " " + f(c.y) + " L" + f(c.x + a[0]) + " " + f(c.y + a[1]) + " " + arc + " Z";
+      s.appendChild(svg("path", { d: d, class: "shade tone-" + (sh.tone || "a") }));
+    });
+    (spec.circles || []).forEach(function (ci) {
+      var c = P[ci.at];
+      s.appendChild(svg("circle", { cx: f(c.x), cy: f(c.y), r: ci.r, class: "ray circ" }));
+      grow(c.x, c.y, ci.r);
+    });
+    // tall drawings are shrunk to fit the height, so grow their marks and letters to match
+    var px = Object.keys(P).map(function (q) { return P[q].x; }), py = Object.keys(P).map(function (q) { return P[q].y; });
+    (spec.circles || []).forEach(function (ci) { var c = P[ci.at]; px.push(c.x - ci.r, c.x + ci.r); py.push(c.y - ci.r, c.y + ci.r); });
+    var w0 = Math.max.apply(null, px) - Math.min.apply(null, px), h0 = Math.max.apply(null, py) - Math.min.apply(null, py);
+    var X = Math.max(1, w0 / 280, h0 / 210) / Math.max(1, w0 / 280);
     function dirTo(at, ref) {
       if (typeof ref === "number") return ref;
       var neg = ref[0] === "-", q = P[neg ? ref.slice(1) : ref];
@@ -243,13 +262,21 @@
       if (n) {
         var t = (Array.isArray(ln) ? ln[3] : ln.at) || 0.5, L = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / L, uy = (b.y - a.y) / L;
         for (var i = 0; i < n; i++) {
-          var cx = a.x + (b.x - a.x) * t + ux * 7 * (i - (n - 1) / 2), cy = a.y + (b.y - a.y) * t + uy * 7 * (i - (n - 1) / 2);
-          s.appendChild(svg("path", { d: "M" + f(cx - ux * 6 - uy * 4.5) + " " + f(cy - uy * 6 + ux * 4.5) + " L" + f(cx) + " " + f(cy) + " L" + f(cx - ux * 6 + uy * 4.5) + " " + f(cy - uy * 6 - ux * 4.5), class: "chev" }));
+          var cx = a.x + (b.x - a.x) * t + ux * 7 * X * (i - (n - 1) / 2), cy = a.y + (b.y - a.y) * t + uy * 7 * X * (i - (n - 1) / 2), c6 = 6 * X, c4 = 4.5 * X;
+          s.appendChild(svg("path", { d: "M" + f(cx - ux * c6 - uy * c4) + " " + f(cy - uy * c6 + ux * c4) + " L" + f(cx) + " " + f(cy) + " L" + f(cx - ux * c6 + uy * c4) + " " + f(cy - uy * c6 - ux * c4), class: "chev" }));
         }
       }
     });
+    // ticks: [["A", "B", 1]] draws equal-side marks across the middle of AB
+    (spec.ticks || []).forEach(function (tk) {
+      var a = P[tk[0]], b = P[tk[1]], n = tk[2] || 1, L = Math.hypot(b.x - a.x, b.y - a.y), ux = (b.x - a.x) / L, uy = (b.y - a.y) / L, sz = 6 * X * Math.max(1, w0 / 280);
+      for (var i = 0; i < n; i++) {
+        var cx = (a.x + b.x) / 2 + ux * 5 * (i - (n - 1) / 2), cy = (a.y + b.y) / 2 + uy * 5 * (i - (n - 1) / 2);
+        s.appendChild(svg("line", { x1: f(cx - uy * sz), y1: f(cy + ux * sz), x2: f(cx + uy * sz), y2: f(cy - ux * sz), class: "chev" }));
+      }
+    });
     (spec.marks || []).forEach(function (mk) {
-      var at = P[mk.at], r = mk.r || 16;
+      var at = P[mk.at], r = (mk.r || 16) * X;
       var a = dirTo(at, mk.a), b = dirTo(at, mk.b), sw = ((b - a) % 360 + 360) % 360;
       if ((sw > 180) !== !!mk.reflex) { var tmp = a; a = b; b = tmp; sw = 360 - sw; }
       var g = svg("g", { transform: "translate(" + f(at.x) + " " + f(at.y) + ")" });
@@ -258,9 +285,9 @@
         g.appendChild(svg("path", { d: "M" + f(u[0]) + " " + f(u[1]) + " L" + f(u[0] + v[0]) + " " + f(u[1] + v[1]) + " L" + f(v[0]) + " " + f(v[1]), class: "mark" }));
       } else if (!mk.bare) g.appendChild(svg("path", { d: arcPath(a, a + sw, r), class: "mark" + (mk.hl ? " hl" : "") }));
       if (mk.label) {
-        var lr = mk.bare ? r : r + (mk.label.length > 3 ? 14 : 10) + (sw < 35 ? 6 : 0) + (mk.push || 0), lp = pt(a + sw / 2, lr);
+        var lr = mk.bare ? r : r + ((mk.label.length > 3 ? 14 : 10) + (sw < 35 ? 6 : 0) + (mk.push || 0)) * X, lp = pt(a + sw / 2, lr);
         g.appendChild(svg("text", { x: f(lp[0]), y: f(lp[1]), class: "arc-label" + (mk.hl ? " hl" : "") }, mk.label));
-        grow(at.x + lp[0], at.y + lp[1], 12);
+        grow(at.x + lp[0], at.y + lp[1], 12 * X);
       }
       s.appendChild(g);
     });
@@ -269,17 +296,17 @@
     Object.keys(P).forEach(function (k) {
       if (k[0] === "_") return;
       var p = P[k], d = p.lab != null ? p.lab : Math.atan2(-(p.y - cy0), p.x - cx0) * 180 / Math.PI;
-      var lp = pt(d, 11);
+      var lp = pt(d, 11 * X);
       s.appendChild(svg("text", { x: f(p.x + lp[0]), y: f(p.y + lp[1]), class: "pt-label" }, k));
-      grow(p.x + lp[0], p.y + lp[1], 9);
+      grow(p.x + lp[0], p.y + lp[1], 9 * X);
     });
     (spec.texts || []).forEach(function (t) {
       s.appendChild(svg("text", { x: t[0], y: -t[1], class: "arc-label" }, t[2])); grow(t[0], -t[1], 12);
     });
-    var pad = 10, vw = box.x1 - box.x0 + 2 * pad;
+    var pad = 10 * X, vw = box.x1 - box.x0 + 2 * pad;
     s.setAttribute("viewBox", [f(box.x0 - pad), f(box.y0 - pad), f(vw), f(box.y1 - box.y0 + 2 * pad)].join(" "));
     // keep letters readable however big the drawing is (it is shown about 380px wide)
-    var k = Math.max(1, vw / 300);
+    var k = Math.max(1, vw / 300) * X;
     Array.prototype.forEach.call(s.querySelectorAll("text"), function (t) { t.style.fontSize = f(12.5 * k) + "px"; });
     return s;
   };

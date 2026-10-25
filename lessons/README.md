@@ -76,6 +76,8 @@ Points: 10 per question, minus 2 per wrong check and 1 per help step opened (nev
 - `{ type: "geo", points: { A: [0, 0], _B: [100, 0, 270] }, meet: { O: ["A", "B", "C", "D"] }, lines: [["A", "B", 2, 0.5]], marks: [{ at: "O", a: "A", b: "-C", label: "x°", r: 16, reflex: false, right: false, bare: false }] }`
   For several crossing points (parallel lines, triangles). Points use maths coordinates (y goes up); an optional third number sets the label direction. Names starting with `_` are not labelled. `meet` places a point where two lines cross. Lines are `[from, to, arrowCount, arrowPosition]`. A mark sits at a point between two directions, each a point name, `"-Name"` (the opposite direction) or a number of degrees; it marks the smaller angle unless `reflex: true`. `bare: true` shows only the letter.
 - Sections can set `no: "11a"` to show their own question number.
+  Extra geo options: `ticks: [["A", "B", 1]]` draws equal-side tick marks on AB; `circles: [{ at: "O", r: 90 }]` draws a circle; `shade: [{ at: "O", r: 90, from: 0, to: 50, kind: "sector" | "segment", tone: "a" | "b" }]` shades a sector or segment (degrees as for angles).
+- An `angle` figure can set `vertexDeg` to choose where the vertex letter goes.
 - `{ type: "clock", sweep: 15 }` draws a clock; `sweep` shades that many minutes from 12.
 
 New drawing types for other subjects can be added in `engine.js` as `Practice.figures.myType = function (spec) { return svgElement; }`.

@@ -27,7 +27,7 @@
   var FIG_Q3_3 = { type: "angle", vertex: "O", rays: [{ deg: 0, label: "X" }, { deg: 120, label: "Y" }, { deg: 180, label: "Z" }],
     arcs: [{ from: 0, to: 120, label: "b", r: 24 }, { from: 120, to: 180, label: "a", r: 30 }] };
 
-  var FIG_Q4_1 = { type: "angle", vertex: "O", rays: [{ deg: 0, label: "Q" }, { deg: 60, label: "S" }, { deg: 180, label: "P" }, { deg: 240, label: "R" }],
+  var FIG_Q4_1 = { type: "angle", vertex: "O", vertexDeg: 300, rays: [{ deg: 0, label: "Q" }, { deg: 60, label: "S" }, { deg: 180, label: "P" }, { deg: 240, label: "R" }],
     arcs: [{ from: 0, to: 60, label: "x", r: 24 }, { from: 180, to: 240, label: "y", r: 24 }] };
   var FIG_Q4_2 = { type: "angle", vertex: "O",
     rays: [{ deg: 0, label: "E" }, { deg: 40, label: "F" }, { deg: 140, label: "A" }, { deg: 180, label: "B" }, { deg: 220, label: "C" }, { deg: 320, label: "D" }],
