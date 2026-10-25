@@ -41,6 +41,160 @@
   }
   function segKey(s) { return letters(s).split("").sort().join(""); }
 
+  /* ---------- algebra ---------- */
+  // Reads what a student types ("3x^2 - 4xy", "2(x+y)", "x²", "1/2 bh") into a polynomial:
+  // { "x2": 3, "x1y1": -4 } (term key -> number). Returns null if it cannot be read.
+  var SUP = { "⁰": "0", "¹": "1", "²": "2", "³": "3", "⁴": "4", "⁵": "5", "⁶": "6", "⁷": "7", "⁸": "8", "⁹": "9" };
+  function cleanAlg(s) {
+    s = String(s).toLowerCase()
+      .replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹]+/g, function (m) { return "^" + m.split("").map(function (c) { return SUP[c]; }).join(""); })
+      .replace(/[−–—]/g, "-").replace(/[×·∙]/g, "*").replace(/÷/g, "/").replace(/½/g, "1/2").replace(/,/g, "");
+    if (s.indexOf("=") !== -1) s = s.slice(s.lastIndexOf("=") + 1);
+    return s.replace(/\s+/g, "");
+  }
+  function algVars(s) { var o = {}; (cleanAlg(s).match(/[a-z]/g) || []).forEach(function (c) { o[c] = 1; }); return o; }
+  function tokAlg(s, vars) {
+    // drop words such as "years" or "cm" that use letters the answer does not use
+    if (vars) s = s.replace(/[a-z]{2,}/g, function (w) { return w.split("").every(function (c) { return vars[c]; }) ? w : ""; });
+    var out = [], m, re = /\d+(?:\.\d+)?|\.\d+|[a-z]|[-+*/^()]/g, used = 0;
+    while ((m = re.exec(s))) { out.push(m[0]); used += m[0].length; }
+    return used === s.length ? out : null;
+  }
+  function pkey(mono) { return Object.keys(mono).filter(function (k) { return mono[k]; }).sort().map(function (k) { return k + mono[k]; }).join(""); }
+  function pmono(key) { var o = {}, m, re = /([a-z])(-?\d+)/g; while ((m = re.exec(key))) o[m[1]] = +m[2]; return o; }
+  function padd(a, b, sg) { var o = {}, k; for (k in a) o[k] = a[k]; for (k in b) o[k] = (o[k] || 0) + sg * b[k]; for (k in o) if (Math.abs(o[k]) < 1e-9) delete o[k]; return o; }
+  function pmul(a, b) {
+    var o = {};
+    Object.keys(a).forEach(function (ka) { Object.keys(b).forEach(function (kb) {
+      var m = pmono(ka), n = pmono(kb), k; for (k in n) m[k] = (m[k] || 0) + n[k];
+      var key = pkey(m); o[key] = (o[key] || 0) + a[ka] * b[kb];
+    }); });
+    return padd(o, {}, 1);
+  }
+  function pinv(a) { // only one term can be divided by
+    var ks = Object.keys(a); if (ks.length !== 1) return null;
+    var m = pmono(ks[0]), k; for (k in m) m[k] = -m[k]; var o = {}; o[pkey(m)] = 1 / a[ks[0]]; return o;
+  }
+  function parseAlg(raw, vars) {
+    var t = tokAlg(cleanAlg(raw), vars), i = 0;
+    if (!t || !t.length) return null;
+    function peek() { return t[i]; }
+    function expr() {
+      var r = term(); if (!r) return null;
+      while (peek() === "+" || peek() === "-") { var sg = t[i++] === "+" ? 1 : -1, b = term(); if (!b) return null; r = padd(r, b, sg); }
+      return r;
+    }
+    function term() {
+      var r = factor(); if (!r) return null;
+      for (;;) {
+        var p = peek();
+        if (p === "*" || p === "/") { i++; var b = factor(); if (!b) return null; if (p === "/") { b = pinv(b); if (!b) return null; } r = pmul(r, b); }
+        else if (p && (p === "(" || /^[a-z0-9.]/.test(p))) { var c = factor(); if (!c) return null; r = pmul(r, c); }
+        else return r;
+      }
+    }
+    function factor() {
+      var p = t[i++], r;
+      if (p === "-" || p === "+") { r = factor(); return r && (p === "-" ? padd({}, r, -1) : r); }
+      if (p === "(") { r = expr(); if (t[i++] !== ")") return null; }
+      else if (p && /^[a-z]$/.test(p)) { r = {}; r[p + "1"] = 1; }
+      else if (p && /^[0-9.]/.test(p)) { r = {}; if (+p) r[""] = +p; }
+      else return null;
+      while (peek() === "^") {
+        i++; var e = t[i++]; if (!/^\d+$/.test(e || "")) return null;
+        var base = r; r = { "": 1 }; for (var k = 0; k < +e; k++) r = pmul(r, base);
+      }
+      return r;
+    }
+    var res = expr();
+    return res && i === t.length ? res : null;
+  }
+  function samePoly(a, b) {
+    var ks = Object.keys(a).concat(Object.keys(b));
+    return ks.every(function (k) { var x = a[k] || 0, y = b[k] || 0; return Math.abs(x - y) <= 1e-6 * Math.max(1, Math.abs(y)); });
+  }
+  // Is the typed answer fully simplified: no brackets, no like terms twice, one number and each letter once per term?
+  function isSimplified(raw, vars) {
+    var s = cleanAlg(raw);
+    if (/[()]/.test(s)) return false;
+    var t = tokAlg(s, vars); if (!t) return false;
+    var terms = [], cur = [];
+    t.forEach(function (x, j) {
+      if ((x === "+" || x === "-") && j > 0 && t[j - 1] !== "^" && t[j - 1] !== "*" && t[j - 1] !== "/") { terms.push(cur); cur = []; }
+      else cur.push(x);
+    });
+    terms.push(cur);
+    var seen = {};
+    return terms.every(function (tt) {
+      var nums = 0, lets = {}, ok = true, m = {};
+      tt.forEach(function (x, j) {
+        if (/^[0-9.]/.test(x) && tt[j - 1] !== "^" && !(tt[j - 1] === "/" && /^[0-9.]/.test(tt[j - 2] || ""))) nums++;
+        if (/^[a-z]$/.test(x)) { if (lets[x]) ok = false; lets[x] = 1; var e = tt[j + 1] === "^" ? +tt[j + 2] : 1; m[x] = e; }
+        if (x === "/" ) ok = ok && !/^[a-z(]/.test(tt[j + 1] || "");
+      });
+      var key = pkey(m); if (seen[key]) ok = false; seen[key] = 1;
+      return ok && nums <= 1;
+    });
+  }
+  function normForm(s, numeric) {
+    s = cleanAlg(s).replace(/[*.]/g, "×");
+    return numeric ? s.replace(/x/g, "×") : s;
+  }
+  // Pretty form for showing typed algebra: 3x^2 -> 3x²
+  Practice.prettyAlg = function (s) {
+    var up = { "0": "⁰", "1": "¹", "2": "²", "3": "³", "4": "⁴", "5": "⁵", "6": "⁶", "7": "⁷", "8": "⁸", "9": "⁹", "-": "⁻" };
+    return String(s).replace(/\^\(?(-?\d+)\)?/g, function (m, d) { return d.split("").map(function (c) { return up[c]; }).join(""); })
+      .replace(/\*/g, "×").replace(/\s*([+=])\s*/g, " $1 ").replace(/(\S)\s*-\s*/g, "$1 − ").replace(/^-/, "−");
+  };
+  function checkExpr(field, raw) {
+    if (field.form === "exact") {
+      var numeric = !/[a-z]/i.test(String(field.answer).replace(/x/g, ""));
+      var want = [field.answer].concat(field.accept || []).map(function (a) { return normForm(a, numeric); });
+      return { ok: want.indexOf(normForm(raw, numeric)) !== -1 };
+    }
+    var vars = algVars(field.answer), got = parseAlg(raw, vars), ans = parseAlg(field.answer);
+    if (!got) return { ok: false, say: "I can't read that. Write it like 3x + 2y, or 4a^2 for 4a²." };
+    if (samePoly(got, ans)) {
+      if (field.form !== "any" && !isSimplified(raw, vars))
+        return { ok: false, say: "That is equal to the answer, but simplify it fully: remove brackets and add the like terms together." };
+      return { ok: true };
+    }
+    var ms = field.mistakes || [];
+    for (var i = 0; i < ms.length; i++) { var mp = parseAlg(ms[i].answer); if (mp && samePoly(got, mp)) return { ok: false, say: ms[i].say }; }
+    return { ok: false };
+  }
+
+  Practice.algebra = { parse: parseAlg, same: samePoly, simplified: isSimplified };
+
+  // Sets: "{1, 3, 5}", "1 3 5" or "a, e, i". Order does not matter; repeats get feedback.
+  function setItems(s) {
+    s = String(s).replace(/[{}∅]/g, " ").replace(/\b(phi|empty)\b/gi, " ").trim();
+    if (!s) return [];
+    return s.split(/\s*[,;]\s*|\s+/).filter(Boolean).map(function (x) {
+      x = x.toLowerCase(); return /^-?\d+(\.\d+)?$/.test(x) ? String(+x) : x;
+    });
+  }
+  Practice.showSet = function (a) { return "{" + a.join(", ") + "}"; };
+  function checkSet(field, raw) {
+    if (field.accept) for (var k = 0; k < field.accept.length; k++)
+      if (checkSet({ answer: field.accept[k] }, raw).ok) return { ok: true };
+    var got = setItems(raw), want = setItems(field.answer.join(", ")), seen = {}, dup = [];
+    got.forEach(function (x) { if (seen[x] && dup.indexOf(x) === -1) dup.push(x); seen[x] = 1; });
+    if (dup.length) return { ok: false, say: "In a set each element is written only once. You repeated: " + dup.join(", ") + "." };
+    var extra = got.filter(function (x) { return want.indexOf(x) === -1; });
+    var miss = want.filter(function (x) { return got.indexOf(x) === -1; });
+    if (!extra.length && !miss.length) return { ok: true };
+    var ms = field.mistakes || [];
+    for (var i = 0; i < ms.length; i++) {
+      var m = setItems(ms[i].answer.join ? ms[i].answer.join(",") : ms[i].answer);
+      if (m.length === got.length && m.every(function (x) { return got.indexOf(x) !== -1; })) return { ok: false, say: ms[i].say };
+    }
+    if (!want.length) return { ok: false, say: "Nothing belongs in this set, so it is the empty set. Type {} ." };
+    if (!got.length) return { ok: false, say: "This set is not empty. Which elements belong to it?" };
+    if (extra.length) return { ok: false, say: "Not in this set: " + extra.join(", ") + "." };
+    return { ok: false, say: "Some elements are missing. This set has " + want.length + (want.length === 1 ? " element" : " elements") + " and you wrote " + got.length + "." };
+  }
+
   // Returns {ok:boolean, say?:string}
   Practice.check = function (field, raw) {
     var t = field.type || "text";
@@ -53,6 +207,19 @@
         var m = field.mistakes[i];
         if (Math.abs(v - m.answer) <= tol) return { ok: false, say: m.say };
       }
+    } else if (t === "expr") {
+      return checkExpr(field, raw);
+    } else if (t === "set") {
+      return checkSet(field, raw);
+    } else if (t === "numeral") {
+      // A number written with commas in the right places, e.g. "2,70,58,91,436" (Nepali) or "2,705,891,436" (International)
+      var g = String(raw).replace(/\s+/g, ""), w = String(field.answer);
+      if (g === w) return { ok: true };
+      if (g.replace(/,/g, "") !== w.replace(/,/g, "")) return { ok: false, say: "Some digits are not right. Check each place again." };
+      if (g.indexOf(",") === -1) return { ok: false, say: "The digits are right. Now put in the commas." };
+      return { ok: false, say: /^\d{1,2}(,\d\d)*,\d{3}$/.test(w) && w.split(",").length > 2
+        ? "The digits are right, but the commas are in the wrong places. Nepali system: a comma after the first 3 digits from the right, then after every 2."
+        : "The digits are right, but the commas are in the wrong places. International system: a comma after every 3 digits from the right." };
     } else if (t === "choice") {
       ok = Array.isArray(field.answer) ? field.answer.indexOf(raw) !== -1 : raw === field.answer;
     } else if (t === "angleName") {
@@ -93,16 +260,21 @@
         focus: function () { btns[0] && btns[0].focus(); },
         mark: function (s) { group.dataset.state = s || ""; } };
     }
-    var ph = { number: "?", angleName: "e.g. ABC", segments: "e.g. AB, AC", text: "" }[t] || "";
+    var ph = { number: "?", angleName: "e.g. ABC", segments: "e.g. AB, AC", set: "e.g. 1, 2, 3", numeral: "e.g. 1,23,456", text: "", expr: field.form === "exact" ? "" : "e.g. 3x^2 + 2y" }[t] || "";
     var inp = el("input", { id: uid, type: "text", class: "inp inp-" + t, autocomplete: "off", spellcheck: "false",
       inputmode: t === "number" ? "decimal" : undefined, placeholder: ph,
       onkeydown: function (e) { if (e.key === "Enter") { e.preventDefault(); onEnter && onEnter(); } },
-      oninput: function () { wrap.dataset.state = ""; } });
+      oninput: function () { wrap.dataset.state = ""; if (prev) prev.textContent = inp.value.trim() && /[\^*]/.test(inp.value) ? "= " + Practice.prettyAlg(inp.value) : ""; } });
+    var prev = t === "expr" ? el("span", { class: "alg-prev", "aria-live": "polite" }) : null;
     var wrap = el("span", { class: "inp-wrap" }, [
-      t === "angleName" ? el("span", { class: "affix", text: "∠" }) : null,
+      t === "angleName" ? el("span", { class: "affix", text: "∠" }) : t === "set" ? el("span", { class: "affix", text: "{" }) : null,
       inp,
+      t === "set" ? el("span", { class: "affix", text: "}" }) : null,
       field.unit ? el("span", { class: "affix", text: field.unit }) : null
     ]);
+    if (prev) { var outer = el("span", { class: "inp-alg" }, [wrap, prev]);
+      return { node: outer, get: function () { return inp.value; }, set: function (v) { inp.value = v || ""; },
+        focus: function () { inp.focus(); }, mark: function (s) { wrap.dataset.state = s || ""; } }; }
     return { node: wrap, get: function () { return inp.value; }, set: function (v) { inp.value = v || ""; },
       focus: function () { inp.focus(); }, mark: function (s) { wrap.dataset.state = s || ""; } };
   }
@@ -336,6 +508,62 @@
     }
     s.appendChild(svg("circle", { cx: 0, cy: 0, r: 3, class: "clock-pin" }));
     if (spec.sweep) s.appendChild(svg("text", { x: 0, y: 22, class: "clock-cap" }, spec.sweep + " min = " + spec.sweep * 6 + "°"));
+    return s;
+  };
+
+  // Venn diagram: { type: "venn", a: { name: "A", items: [...] }, b: { name: "B", items: [...] }, u: { name: "U", items: [...] } }
+  // Items found in both a and b go in the middle. With no common items the circles are drawn apart.
+  Practice.figures.venn = function (spec) {
+    var A = spec.a.items.map(String), B = spec.b ? spec.b.items.map(String) : [];
+    var both = A.filter(function (x) { return B.indexOf(x) !== -1; });
+    var onlyA = A.filter(function (x) { return both.indexOf(x) === -1; }), onlyB = B.filter(function (x) { return both.indexOf(x) === -1; });
+    var apart = spec.b && !both.length, one = !spec.b, inside = spec.b && both.length && !onlyB.length && onlyA.length;
+    var W = 320, H = spec.u ? 210 : 190, cy = spec.u ? 112 : 100, r = apart ? 62 : 72;
+    var ca = one ? 160 : apart ? 88 : 122, cb = apart ? 232 : 198;
+    var s = svg("svg", { class: "fig fig-venn", viewBox: "0 0 " + W + " " + H, role: "img", "aria-label": "Venn diagram" });
+    if (spec.u) {
+      s.appendChild(svg("rect", { x: 6, y: 6, width: W - 12, height: H - 12, rx: 8, class: "venn-u" }));
+      s.appendChild(svg("text", { x: 20, y: 24, class: "venn-name" }, spec.u.name || "U"));
+    }
+    if (inside) { // B is a subset of A: draw B inside A
+      s.appendChild(svg("circle", { cx: 160, cy: cy, r: 84, class: "venn-c tone-a" }));
+      s.appendChild(svg("circle", { cx: 192, cy: cy, r: 44, class: "venn-c tone-b" }));
+      s.appendChild(svg("text", { x: 100, y: cy - 66, class: "venn-name" }, spec.a.name));
+      s.appendChild(svg("text", { x: 192, y: cy - 56, class: "venn-name" }, spec.b.name));
+    }
+    function place(items, x, maxCols) {
+      var cols = items.length > 4 ? Math.min(maxCols, 2) : 1, rows = Math.ceil(items.length / cols), dy = rows > 4 ? 19 : 22, dx = 26;
+      items.forEach(function (it, i) {
+        var c = i % cols, rr = Math.floor(i / cols);
+        s.appendChild(svg("text", { x: f(x + (c - (cols - 1) / 2) * dx), y: f(cy + (rr - (rows - 1) / 2) * dy), class: "venn-item" }, it));
+      });
+    }
+    if (inside) { place(onlyA, 112, 2); place(both, 192, 2); return s; }
+    s.appendChild(svg("circle", { cx: ca, cy: cy, r: r, class: "venn-c tone-a" }));
+    if (!one) s.appendChild(svg("circle", { cx: cb, cy: cy, r: r, class: "venn-c tone-b" }));
+    s.appendChild(svg("text", { x: ca - r * 0.72, y: cy - r * 0.86, class: "venn-name" }, spec.a.name));
+    if (!one) s.appendChild(svg("text", { x: cb + r * 0.72, y: cy - r * 0.86, class: "venn-name" }, spec.b.name));
+    if (one) place(onlyA, ca, 3);
+    else if (apart) { place(onlyA, ca, 2); place(onlyB, cb, 2); }
+    else { place(onlyA, ca - 40, 2); place(both, (ca + cb) / 2, 1); place(onlyB, cb + 40, 2); }
+    if (spec.u && spec.u.items) {
+      var rest = spec.u.items.map(String).filter(function (x) { return A.indexOf(x) === -1 && B.indexOf(x) === -1; });
+      rest.forEach(function (it, i) { s.appendChild(svg("text", { x: 26, y: 52 + i * 20, class: "venn-item" }, it)); });
+    }
+    return s;
+  };
+
+  // Table puzzle: { type: "grid", rows: [["+", "9", "?a"], ["6", "15", "?b"]] }. "?a" draws an empty box labelled a.
+  Practice.figures.grid = function (spec) {
+    var R = spec.rows.length, C = spec.rows[0].length, cw = 56, chh = 44;
+    var s = svg("svg", { class: "fig fig-grid", viewBox: "-2 -2 " + (C * cw + 4) + " " + (R * chh + 4), role: "img", "aria-label": "Number puzzle" });
+    spec.rows.forEach(function (row, r) {
+      row.forEach(function (v, c) {
+        var blank = String(v).charAt(0) === "?", head = r === 0 || c === 0;
+        s.appendChild(svg("rect", { x: c * cw, y: r * chh, width: cw, height: chh, class: "grid-cell" + (head ? " head" : "") + (blank ? " blank" : "") }));
+        s.appendChild(svg("text", { x: c * cw + cw / 2, y: r * chh + chh / 2, class: blank ? "grid-q" : "grid-t" }, blank ? String(v).slice(1) : v));
+      });
+    });
     return s;
   };
 
@@ -635,7 +863,7 @@
           }
         }
         function reveal(right) {
-          var shownAns = Array.isArray(step.ask.answer) ? step.ask.answer[0] : step.ask.answer;
+          var shownAns = step.ask.type === "set" ? step.ask.answer.join(", ") : Array.isArray(step.ask.answer) ? step.ask.answer[0] : step.ask.answer;
           inp.mark("ok"); inp.set(step.ask.type === "choice" ? shownAns : String(shownAns));
           cbtn.disabled = true; show.hidden = true;
           fb.className = "ask-fb good";
