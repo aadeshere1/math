@@ -57,3 +57,10 @@
 .sea-cloud.c1 { animation-duration: 34s; animation-delay: -8s; } .sea-cloud.c2 { animation-duration: 30s; animation-delay: -15s; }
 @keyframes seaCloud { from { transform: translateX(-40px); } to { transform: translateX(40px); } }
 @media (prefers-reduced-motion: reduce) { .sea-cloud { animation: none; } }
+/* Species reveal and extras */
+.sea-card-tier { margin: 2px 0 4px; font-size: .92rem; color: var(--ink-soft, #4a5b6c); }
+.sea-spark { transform-box: fill-box; transform-origin: center; animation: seaSpark 1.2s ease-out both; }
+@keyframes seaSpark { from { transform: translate(0, 0) scale(.3) rotate(0deg); opacity: 1; } to { transform: translate(var(--dx), var(--dy)) scale(1.2) rotate(140deg); opacity: 0; } }
+.sea-spout { animation: seaSpout 3.4s ease-in-out infinite; transform-box: fill-box; transform-origin: 50% 100%; }
+@keyframes seaSpout { 0%, 55%, 100% { opacity: 0; transform: scaleY(.3); } 65%, 85% { opacity: .95; transform: scaleY(1); } }
+@media (prefers-reduced-motion: reduce) { .sea-spark, .sea-spout { animation: none; } .sea-spout { opacity: .9; } }
