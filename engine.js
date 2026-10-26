@@ -1412,6 +1412,8 @@
     qs.forEach(function (q) { var r = p.q[q.id]; if (r && r.solved) { done++; pts += r.points; } });
     return { done: done, total: qs.length, points: pts, max: qs.length * 10 };
   }
+  Practice.stats = function (l) { return stats(l); };
+  Practice.open = function (id) { openLesson(id); window.scrollTo && window.scrollTo(0, 0); };
   function secStats(l, sec) {
     var p = lp(l), d = 0; sec.questions.forEach(function (q) { if (p.q[q.id] && p.q[q.id].solved) d++; });
     return { done: d, total: sec.questions.length };
@@ -1447,6 +1449,7 @@
         ]));
       });
     });
+    if (Practice.aquarium) { try { app.appendChild(Practice.aquarium.render()); } catch (e) { if (window.console) console.error(e); } }
     app.appendChild(head); app.appendChild(grid);
   }
 
@@ -1605,13 +1608,16 @@
         feedback.className = "feedback"; feedback.textContent = "Type or pick an answer first."; return;
       }
       if (allOk) {
-        if (!r.solved) {
+        var fresh = !r.solved;
+        if (fresh) {
           r.solved = true;
           r.points = Math.max(3, 10 - 2 * (r.attempts || 0) - (r.help || 0));
           r.answers = answers; saveProg(l);
         }
         feedback.className = "feedback good";
-        feedback.innerHTML = "<b>Correct!</b> +" + r.points + " points" + (r.points === 10 ? " · solved on your own" : "");
+        var sea = "";
+        if (fresh && Practice.aquarium) { try { sea = Practice.aquarium.onSolve(l, r.points); } catch (e) { sea = ""; } }
+        feedback.innerHTML = "<b>Correct!</b> +" + r.points + " points" + (r.points === 10 ? " · solved on your own" : "") + (sea ? '<span class="sea-fb">' + sea + "</span>" : "");
         nextBtn.hidden = false; nextBtn.focus();
         refreshChrome(l);
       } else {

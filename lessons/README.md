@@ -130,3 +130,7 @@ New drawing types for other subjects can be added in `engine.js` as `Practice.fi
 
 - `Practice.eq.solve(id, "3x - 4 = 2x + 5", opts)` builds a whole question with worked help: simplify each side, clear fractions by the L.C.M., move the letter terms, move the numbers, divide, then check. The answer is a number, or a fraction if it is not whole. `opts`: `prompt`, `label`, `unit`, `intro`, `outro`, `check: false`, `answerText`, `cross`. The returned question also has `value` ([numerator, denominator]).
 - `Practice.eq.sides(expr)` gives `{ v, op, a, b, c, d }` for a x + b (op) c x + d, as fractions. `Practice.eq.lin(a, b, "x")` writes a x + b nicely.
+
+## Fish sea (aquarium.js)
+
+The home page opens with a sea. Each chapter is one fish, found from the lesson title ("Exercise 3.2" is Chapter 3). A fish grows with every solved question in its chapter and passes five stages at 0%, 25%, 50%, 75% and 100%: Tiny fry, Little fish, Growing fish, Big fish and King fish (with a crown). Points are called pearls, and pearls unlock sea friends (shell, crab, turtle and more; the list is `FRIENDS` in aquarium.js). The streak counts days in a row with at least one solved question. All of it lives in the browser's storage, like the rest of the progress. New lessons need nothing extra: they join their chapter's fish by their title.
