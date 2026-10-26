@@ -362,6 +362,10 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .sea-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 3px 12px 3px 3px; font-size: .82rem; cursor: pointer; }
 .sea-pill:hover { border-color: var(--fc); }
 .sea-pill .sea-dot { background: var(--fc); }
+.sea-empty { position: absolute; inset: 0 0 70px; display: grid; place-content: center; text-align: center; color: #fff; padding: 16px; text-shadow: 0 1px 3px rgba(0, 0, 0, .35); pointer-events: none; }
+.sea-empty p { margin: 2px 0; font: 800 clamp(1.1rem, 3vw, 1.5rem) var(--f-display); }
+.sea-empty .sea-empty-s { font: 400 1rem var(--f-body); }
+.sea-empty .sea-empty-e { font-size: 3rem; animation: seaSway 1.6s ease-in-out infinite alternate; }
 .sea-fb { display: block; margin-top: 4px; font-weight: 400; }
 @keyframes seaSway { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
 @keyframes seaRay { from { opacity: .03; } to { opacity: .12; } }

@@ -83,13 +83,13 @@
     var map = {}, out = [];
     P.lessons.forEach(function (l) {
       var n = chapterNum(l), key = n != null ? "c" + n : "u" + (l.unit || l.title);
-      if (!map[key]) { map[key] = { num: n, unit: l.unit || l.title, lessons: [], done: 0, total: 0, points: 0 }; out.push(map[key]); }
+      if (!map[key]) { map[key] = { num: n, unit: l.unit || l.title, lessons: [], done: 0, total: 0, points: 0, tried: 0 }; out.push(map[key]); }
       var c = map[key], st = P.stats(l);
-      c.lessons.push(l); c.done += st.done; c.total += st.total; c.points += st.points;
+      c.lessons.push(l); c.done += st.done; c.total += st.total; c.points += st.points; c.tried += st.tried || 0;
     });
     out.sort(function (a, b) { return (a.num == null ? 999 : a.num) - (b.num == null ? 999 : b.num); });
     out.forEach(function (c, i) {
-      c.idx = i; c.p = c.total ? c.done / c.total : 0; c.stage = stageOf(c.p);
+      c.idx = i; c.started = c.tried > 0 || c.done > 0; c.p = c.total ? c.done / c.total : 0; c.stage = stageOf(c.p);
       c.name = NAMES[i % NAMES.length]; c.col = COLORS[i % COLORS.length];
       c.label = c.num != null ? String(c.num) : String(i + 1);
       c.title = (c.num != null ? "Chapter " + c.num : "Chapter") + " · " + c.unit;
@@ -160,16 +160,18 @@
   var H = 420, SAND = 70, running = null;
 
   function render() {
-    var chs = chapters(), pearls = totalPoints(chs);
+    var all = chapters(), pearls = totalPoints(all);
+    var chs = all.filter(function (c) { return c.started; });
     var memo = store("practice:sea") || null;
-    var grown = [], friendsNew = [];
+    var grown = [], friendsNew = [], hatched = [];
     var unlocked = FRIENDS.filter(function (f) { return pearls >= f.at; });
     if (memo) {
       chs.forEach(function (c) { var was = memo.stages && memo.stages[c.label]; if (was != null && c.stage > was) grown.push(c); });
       unlocked.forEach(function (f) { if ((memo.pearls || 0) < f.at) friendsNew.push(f); });
+      if (memo.fish) chs.forEach(function (c) { if (memo.fish.indexOf(c.label) < 0) hatched.push(c); });
     }
     var stages = {}; chs.forEach(function (c) { stages[c.label] = c.stage; });
-    store("practice:sea", { stages: stages, pearls: pearls });
+    store("practice:sea", { stages: stages, pearls: pearls, fish: chs.map(function (c) { return c.label; }) });
 
     var kings = chs.filter(function (c) { return c.stage === 4; }).length;
     var nextF = FRIENDS.filter(function (f) { return pearls < f.at; })[0];
@@ -179,7 +181,7 @@
     var wrap = E("section", { class: "sea-wrap", "aria-label": "Your fish sea" });
     var chips = E("div", { class: "sea-chips" }, [
       E("span", { class: "sea-chip" }, [E("b", { text: commas(pearls) }), " pearls"]),
-      E("span", { class: "sea-chip" }, [E("b", { text: kings + " of " + chs.length }), " King fish"]),
+      E("span", { class: "sea-chip" }, [E("b", { text: kings + " of " + all.length }), " King fish"]),
       E("span", { class: "sea-chip" + (st ? " hot" : "") }, [E("b", { text: st ? "🔥 " + st : "0" }), st === 1 ? " day streak" : " day streak"]),
       nextF ? E("span", { class: "sea-chip next" }, [
         E("span", { class: "sea-next-e", text: nextF.e }),
@@ -190,12 +192,13 @@
     ]);
     var head = E("div", { class: "sea-head" }, [
       E("div", {}, [E("h2", { text: "Your fish sea" }),
-        E("p", { class: "sea-sub", text: "Every chapter has a fish. Solve questions to feed it and watch it grow into a King fish. Tap a fish to meet it." })]),
+        E("p", { class: "sea-sub", text: "Start an exercise and a fish for its chapter hatches here. Solve questions to feed it and watch it grow into a King fish. Tap a fish to meet it." })]),
       chips
     ]);
     wrap.appendChild(head);
 
     var msgs = [];
+    hatched.slice(0, 3).forEach(function (c) { msgs.push("🐣 A new fish hatched: " + c.name + " for Chapter " + c.label + "!"); });
     grown.slice(0, 3).forEach(function (c) { msgs.push("🎉 " + c.name + " (Chapter " + c.label + ") grew into a " + STAGES[c.stage] + "!"); });
     friendsNew.slice(0, 2).forEach(function (f) { msgs.push(f.e + " A " + f.name.toLowerCase() + " joined your sea!"); });
     if (msgs.length) wrap.appendChild(E("div", { class: "sea-toast", role: "status" }, msgs.map(function (m) { return E("p", { text: m }); })));
@@ -205,6 +208,8 @@
     box.appendChild(svg);
     var card = E("div", { class: "sea-card", hidden: "hidden" });
     box.appendChild(card);
+    if (!chs.length) box.appendChild(E("div", { class: "sea-empty" }, [E("p", { class: "sea-empty-e", text: "🥚" }),
+      E("p", { text: "Your sea is waiting for its first fish." }), E("p", { class: "sea-empty-s", text: "Start any exercise below and a fish for that chapter will hatch here." })]));
     wrap.appendChild(box);
 
     // fish list for keyboard and screen readers

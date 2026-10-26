@@ -1408,9 +1408,13 @@
   function saveProg(l) { store(progKey(l), lp(l)); }
   function allQs(l) { var out = []; l.sections.forEach(function (s) { s.questions.forEach(function (q) { out.push(q); }); }); return out; }
   function stats(l) {
-    var p = lp(l), qs = allQs(l), done = 0, pts = 0;
-    qs.forEach(function (q) { var r = p.q[q.id]; if (r && r.solved) { done++; pts += r.points; } });
-    return { done: done, total: qs.length, points: pts, max: qs.length * 10 };
+    var p = lp(l), qs = allQs(l), done = 0, pts = 0, tried = 0;
+    qs.forEach(function (q) {
+      var r = p.q[q.id]; if (!r) return;
+      if (r.solved) { done++; pts += r.points; }
+      if (r.solved || r.attempts || r.help) tried++;
+    });
+    return { done: done, total: qs.length, points: pts, max: qs.length * 10, tried: tried };
   }
   Practice.stats = function (l) { return stats(l); };
   Practice.open = function (id) { openLesson(id); window.scrollTo && window.scrollTo(0, 0); };
