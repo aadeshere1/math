@@ -76,6 +76,7 @@ Answer types (used in `parts` and in `ask`):
 | `equiv`     | `"1/2"`               | a list of fractions equivalent to the answer, e.g. 2/4, 3/6, 4/8. `count` (default 3); `mode: "mul"` wants ×2, ×3, ×4; `mode: "div"` wants smaller denominators. Give `example` with one right list. |
 | `dec`       | `"0.62"`              | a decimal. Accepts .62 and 0.620. Says when the decimal point is in the wrong place, or when a fraction was typed (`fracOk: true` allows an equal fraction). `dp: 2` with `round: "0.39768"` is for rounding: it needs exactly 2 decimal places (0.40) and explains rounding up. `tolerance` for recurring decimals. |
 | `expand`    | `"0.25"`              | expanded form, e.g. 0.2 + 0.05, 2/10 + 5/100 or 2 × 0.1 + 5 × 0.01. Each part must be one digit in its place. Give `example`. |
+| `rel`       | `"2x + 3 = x + 6"`    | an equation or inequality (=, <, >, <= or ≤, >= or ≥). Any equivalent form is right (8x = 80 for 4 × 2x = 80, 6 > x for x < 6). Says when the sign points the wrong way or when ≤/≥ and </> are mixed up. `exact: true` asks for the same form. |
 | `expr`      | `"3x^2+4y"`           | algebra. Accepts any equal answer written in simplest form (4y + 3x is fine; 2x + x + 4y gets "simplify fully"). `form: "any"` also accepts unsimplified forms such as 2(x + y). `form: "exact"` compares the text, e.g. `"2^2×3^2"` with `accept: [...]`. Students type powers with ^ (or ², ³). |
 
 Points: 10 per question, minus 2 per wrong check and 1 per help step opened (never below 3).
@@ -98,6 +99,10 @@ Points: 10 per question, minus 2 per wrong check and 1 per help step opened (nev
 - `{ type: "flow", nodes: { s: [0, 0, "0.6"], a: [1, 0, "?a"] }, arrows: [["s", "a", "÷ 2"]] }` draws an arrow puzzle: circles on a grid (column, row) joined by labelled arrows; `"?a"` is an empty circle labelled a.
 - `{ type: "ftree", root: { v: "18", kids: [{ v: "2" }, { v: "?a", kids: [{ v: "?b" }, { v: "3" }] }] } }` draws a factor tree; `?a` is an empty circle labelled a.
 - `{ type: "nline", from: -10, to: 10, hops: [[0, 3], [3, 6]], big: [0, 6] }` draws a number line with jumps; `big` adds a dashed arc for the total.
+  Add `range: [lo, hi, loClosed, hiClosed]` to show an inequality: open or filled circles at the ends and a raised line between; `null` for an end draws an arrow that way (x < 3 is `[null, 3, false, false]`).
+- `{ type: "balance", left: { bags: 2, v: "x", balls: 0 }, right: { bags: 1, v: "x", balls: 4 } }` draws a level balance with letter bags and balls.
+- `{ type: "shape", polys: [{ pts: [[0, 0], [7, 0], [7, 4], [0, 4]], tone: "a" }], sides: [["7 cm", 0, 0]] }` draws plane shapes to scale (units, y goes down). Tone `"a"`/`"b"` shades a polygon, `"w"` draws a white cut-out on top, no tone draws an outline. `sides: [text, polyIndex, edgeIndex, { in: true, at: [x, y] }]` labels an edge outside the shape (or inside, or at a point). Also `grid: [w, h]` (graph paper), `dashes: [[x1, y1, x2, y2]]` (fold or split lines), `ticks: [[poly, edge, count]]` (equal-side marks), `right: [[x, y, "bl"]]` (square corner), `text: [[x, y, "A", "big"]]`, `circles`, `ellipses`.
+- `{ type: "solid", kind: "cuboid" | "cube" | "cylinder" | "cone" | "sphere", l: 4, b: 3, h: 2, labels: { l: "4 cm", b: "3 cm", h: "2 cm" } }` draws a solid with hidden edges dashed.
 - `{ type: "fbar", parts: 8, shade: [[0, 3, "a"], [3, 5, "b"]] }` and `{ type: "pie", parts: 6, shade: [[0, 1, "a"]] }` draw a fraction bar or circle with shaded parts. Add `count: 3` to draw 3 bars (stacked) or 3 circles (side by side); shade indexes then run on across them, e.g. parts 4, count 3, shade [[0, 11]] shows 11/4. Tone `"x"` draws crossed-out parts (shaded with an X), for subtraction pictures.
 - `{ type: "row", items: [{ type: "fbar", parts: 2, shade: [[0, 1]], caption: "1/2" }, "+", { type: "fbar", parts: 3, shade: [[0, 1]], caption: "1/3" }] }` puts small figures in a row with signs between them; `caption` goes under a figure.
 - `{ type: "coord", range: [-5, 5, -5, 5], points: { A: [2, 3] }, polys: [["P", "Q", "R", "S"]], open: [["E", "F", "G"]] }` draws a coordinate grid with axes X'OX and Y'OY, labelled points, closed shapes (`polys`) and open paths (`open`).
@@ -120,3 +125,8 @@ New drawing types for other subjects can be added in `engine.js` as `Practice.fi
 
 - Values are exact fractions, so 0.1 + 0.2 is exactly 0.3. `of("0.25")` gives `[1, 4]`; `str(v)` gives "0.25"; `round("0.39768", 2)` gives "0.40"; `dps("0.25")` gives 2.
 - `Practice.dec.calc(id, "12 × (4.8 ÷ 0.3) − 3.5 × 3.64", opts)` builds a whole question with worked help: line up the points for + and −, count decimal places for ×, make the divisor whole for ÷, move the point for × and ÷ by 10, 100, 1000. Brackets `( ) { } [ ]` and squares `(1.5)²` work. `opts`: `prompt`, `label`, `unit`, `intro` (step texts before), `outro`, `dp` (round the answer), `answer`, `pre`, `mistakes`.
+
+### Equation helpers (`Practice.eq`)
+
+- `Practice.eq.solve(id, "3x - 4 = 2x + 5", opts)` builds a whole question with worked help: simplify each side, clear fractions by the L.C.M., move the letter terms, move the numbers, divide, then check. The answer is a number, or a fraction if it is not whole. `opts`: `prompt`, `label`, `unit`, `intro`, `outro`, `check: false`, `answerText`, `cross`. The returned question also has `value` ([numerator, denominator]).
+- `Practice.eq.sides(expr)` gives `{ v, op, a, b, c, d }` for a x + b (op) c x + d, as fractions. `Practice.eq.lin(a, b, "x")` writes a x + b nicely.

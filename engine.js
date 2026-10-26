@@ -228,7 +228,7 @@
   }
   // Fraction arithmetic for lesson files: values are [num, den] in lowest terms.
   Practice.fr = (function () {
-    function red(a) { var g = fracG(a[0], a[1]) || 1; return [a[0] / g, a[1] / g]; }
+    function red(a) { var g = fracG(a[0], a[1]) || 1; if (a[1] < 0) g = -g; return [a[0] / g, a[1] / g]; }
     var F = {
       of: function (t) { return red(parseAny(t)); },
       add: function (a, b) { return red([a[0] * b[1] + b[0] * a[1], a[1] * b[1]]); },
@@ -524,6 +524,104 @@
     return { ok: true };
   }
 
+  /* ---------- equations and inequalities ---------- */
+  // rel: an equation or inequality, e.g. "x + 5 = 9" or "x - 1 >= 3". Any equal form is accepted
+  // (9 = x + 5, 4 < x, x - 4 > 0). Options: exact (the sides must match, not just be equivalent).
+  var REL = { "<": 1, ">": 1, "=": 1, "<=": 1, ">=": 1 }, FLIP = { "<": ">", ">": "<", "=": "=", "<=": ">=", ">=": "<=" };
+  function splitRel(raw) {
+    var s = String(raw).replace(/≤|=<|⩽/g, "<=").replace(/≥|=>|⩾/g, ">=").replace(/[−–]/g, "-").replace(/÷/g, "/");
+    var ops = s.match(/<=|>=|<|>|=/g);
+    if (!ops || ops.length !== 1) return null;
+    var op = ops[0], parts = s.split(op);
+    if (parts.length !== 2 || !parts[0].trim() || !parts[1].trim()) return null;
+    return { l: parts[0], op: op, r: parts[1] };
+  }
+  function relPoly(rel) {
+    var vars = {}; "abcdefghijklmnopqrstuvwxyz".split("").forEach(function (c) { vars[c] = 1; });
+    var L = parseAlg(rel.l, vars), R = parseAlg(rel.r, vars);
+    return L && R ? padd(L, R, -1) : null;
+  }
+  function ratio(a, b) { // a = k b ? returns k or null
+    var k = null, ks = Object.keys(a).concat(Object.keys(b));
+    for (var i = 0; i < ks.length; i++) {
+      var x = a[ks[i]] || 0, y = b[ks[i]] || 0;
+      if (!y && !x) continue;
+      if (!y || !x) return null;
+      var r = x / y; if (k === null) k = r; else if (Math.abs(k - r) > 1e-6 * Math.abs(k)) return null;
+    }
+    return k;
+  }
+  function checkRel(field, raw) {
+    var w = splitRel(field.answer), g = splitRel(raw);
+    if (!g) return { ok: false, say: "Write one sign: =, <, >, <= (≤) or >= (≥), with an expression on each side. Example: x + 2 = 5." };
+    var pw = relPoly(w), pg = relPoly(g);
+    if (!pg) return { ok: false, say: "I can't read one side. Use letters, numbers and + − × /, like 3x + 2 = 11." };
+    var k = ratio(pg, pw);
+    if (k === null) return { ok: false };
+    var want = k > 0 ? w.op : FLIP[w.op];
+    if (g.op !== want) {
+      var strict = { "<": 1, ">": 1 };
+      if ((strict[g.op] && !strict[want]) || (!strict[g.op] && strict[want] && g.op !== "=")) return { ok: false, say: g.op.length === 1 ? "Should the number itself be included? \"At least\" or \"or equal to\" needs ≤ or ≥ (type <= or >=)." : "Should the number itself be included? \"Less than\" or \"greater than\" alone needs < or >, without the equal part." };
+      return { ok: false, say: w.op === "=" ? "This should be an equation, with =." : "The sign points the wrong way. The open side of < or > faces the bigger number." };
+    }
+    if (field.exact && Math.abs(k - 1) > 1e-9 && Math.abs(k + 1) > 1e-9) return { ok: false, say: "That is equal, but write it in its simplest form, like " + field.answer + "." };
+    return { ok: true };
+  }
+  // Linear equation solver for lesson files: Practice.eq.solve(id, "3x - 4 = 2x + 5", opts) builds a question with worked steps.
+  Practice.eq = (function () {
+    var F = Practice.fr;
+    function rat(v) { // float -> [n, d]
+      for (var d = 1; d <= 10000; d++) { var n = v * d; if (Math.abs(n - Math.round(n)) < 1e-7) return F.of(Math.round(n) + "/" + d); }
+      return [v, 1];
+    }
+    function num(r) { return F.str(r).replace("-", "−"); }
+    function lin(a, b, x) { // a x + b
+      var s = "";
+      if (a[0]) s = (a[0] === a[1] ? "" : a[0] === -a[1] ? "−" : num(a)) + x;
+      if (b[0]) s += s ? (b[0] < 0 ? " − " + num([-b[0], b[1]]) : " + " + num(b)) : num(b);
+      return s || "0";
+    }
+    function sides(expr) {
+      var rel = splitRel(expr), v = (expr.match(/[a-z]/) || ["x"])[0], vars = {}; vars[v] = 1;
+      var L = parseAlg(rel.l, vars), R = parseAlg(rel.r, vars);
+      return { v: v, op: rel.op, a: rat(L[v + "1"] || 0), b: rat(L[""] || 0), c: rat(R[v + "1"] || 0), d: rat(R[""] || 0) };
+    }
+    function solve(id, expr, opts) {
+      opts = opts || {};
+      var e = sides(expr), x = e.v, help = (opts.intro || []).map(function (t) { return { text: t }; }), a = e.a, b = e.b, c = e.c, d = e.d;
+      var L = 1; [a, b, c, d].forEach(function (r) { L = Practice.nt.lcm(L, r[1]); });
+      var simple = lin(a, b, x) + " " + (e.op === "=" ? "=" : e.op) + " " + lin(c, d, x), norm = function (t) { return String(t).replace(/[\s*×]/g, "").replace(/[−–]/g, "-"); };
+      var terms = function (t) { return (String(t).replace(/^\s*[-−]/, "").match(/[+\-−]/g) || []).length + 1; }, rs = splitRel(expr);
+      if (L === 1 && (/[()]/.test(expr) || terms(rs.l) > terms(lin(a, b, x)) || terms(rs.r) > terms(lin(c, d, x)))) help.push({ text: "Simplify each side: " + simple + "." });
+      if (L > 1) {
+        var m = [L, 1]; a = F.mul(a, m); b = F.mul(b, m); c = F.mul(c, m); d = F.mul(d, m);
+        help.push({ text: "Clear the fractions: multiply both sides by " + L + (opts.cross ? " (or cross-multiply)" : " (the L.C.M. of the denominators)") + ". " + lin(a, b, x) + " = " + lin(c, d, x) + "." });
+      }
+      if (c[0]) {
+        var a2 = F.sub(a, c);
+        help.push({ text: (c[0] > 0 ? "Subtract " + lin(c, [0, 1], x) + " from" : "Add " + lin([-c[0], c[1]], [0, 1], x) + " to") + " both sides: " + lin(a2, b, x) + " = " + num(d) + "." });
+        a = a2; c = [0, 1];
+      }
+      if (b[0]) {
+        var d2 = F.sub(d, b);
+        help.push({ text: (b[0] > 0 ? "Subtract " + num(b) + " from" : "Add " + num([-b[0], b[1]]) + " to") + " both sides: " + lin(a, [0, 1], x) + " = " + num(d2) + "." });
+        d = d2; b = [0, 1];
+      }
+      var res = F.div(d, a);
+      if (!(a[0] === a[1])) help.push({ text: (a[0] === -a[1] ? "Multiply both sides by −1" : a[1] === 1 ? "Divide both sides by " + num(a) : "Multiply both sides by " + num([a[1], a[0]])) + ": " + x + " = " + num(res) + "." });
+      if (opts.check !== false) {
+        var E = sides(expr), lv = F.add(F.mul(E.a, res), E.b), rv = F.add(F.mul(E.c, res), E.d);
+        help.push({ text: "Check: put " + x + " = " + num(res) + " in the equation. Left side = " + num(lv) + ", right side = " + num(rv) + " ✓" });
+      }
+      (opts.outro || []).forEach(function (t) { help.push({ text: t }); });
+      help.push({ text: "Answer: **" + (opts.answerText || x + " = " + num(res)) + "**." });
+      var part = F.isInt(res) ? { id: "v", label: opts.label || x + " =", type: "number", answer: res[0] } : { id: "v", label: opts.label || x + " =", type: "frac", answer: F.mixed(res), mixedOk: true };
+      if (opts.unit) part.unit = opts.unit;
+      return { id: id, prompt: opts.prompt || "**" + Practice.prettyAlg(expr) + "**", parts: [part], help: help, value: res };
+    }
+    return { solve: solve, sides: sides, lin: lin };
+  })();
+
   // Returns {ok:boolean, say?:string}
   Practice.check = function (field, raw) {
     var t = field.type || "text";
@@ -548,6 +646,8 @@
       return checkMixed(field, raw);
     } else if (t === "dec") {
       return checkDec(field, raw);
+    } else if (t === "rel") {
+      return checkRel(field, raw);
     } else if (t === "expand") {
       return checkExpand(field, raw);
     } else if (t === "equiv") {
@@ -629,7 +729,7 @@
         set: function (v) { var p = parsePoint(v); if (p) place(p[0], p[1]); },
         focus: function () { gsvg.focus(); }, mark: function (st) { box.dataset.state = st || ""; } };
     }
-    var ph = { number: "?", angleName: "e.g. ABC", segments: "e.g. AB, AC", set: "e.g. 1, 2, 3", numeral: "e.g. 1,23,456", factors: "e.g. 2 × 2 × 3", frac: "e.g. 3/8", point: "e.g. (2, 3)", mixed: "e.g. 2 3/4", dec: "e.g. 0.25", expand: "e.g. 0.2 + 0.05", equiv: "e.g. 2/4, 3/6, 4/8", text: "", expr: field.form === "exact" ? "" : "e.g. 3x^2 + 2y" }[t] || "";
+    var ph = { number: "?", angleName: "e.g. ABC", segments: "e.g. AB, AC", set: "e.g. 1, 2, 3", numeral: "e.g. 1,23,456", factors: "e.g. 2 × 2 × 3", frac: "e.g. 3/8", point: "e.g. (2, 3)", mixed: "e.g. 2 3/4", dec: "e.g. 0.25", rel: "e.g. x + 2 = 5", expand: "e.g. 0.2 + 0.05", equiv: "e.g. 2/4, 3/6, 4/8", text: "", expr: field.form === "exact" ? "" : "e.g. 3x^2 + 2y" }[t] || "";
     var inp = el("input", { id: uid, type: "text", class: "inp inp-" + t, autocomplete: "off", spellcheck: "false",
       inputmode: t === "number" || t === "dec" ? "decimal" : undefined, placeholder: ph,
       onkeydown: function (e) { if (e.key === "Enter") { e.preventDefault(); onEnter && onEnter(); } },
@@ -1016,6 +1116,124 @@
     return s;
   };
 
+  // Plane shapes drawn to scale (units, y goes down):
+  // { type: "shape", polys: [{ pts: [[0,0],[7,0],[7,4],[0,4]], tone: "a" | "w" | null, dash: false, open: false }],
+  //   sides: [["7 cm", 0, 0, { in: false }]], text: [[x, y, "A"]], dashes: [[x1, y1, x2, y2]], grid: [w, h], circles: [[cx, cy, r]], ellipses: [[cx, cy, rx, ry]], right: [[x, y, "tl"]] }
+  Practice.figures.shape = function (spec) {
+    var polys = (spec.polys || []).map(function (p) { return Array.isArray(p) ? { pts: p } : p; });
+    var xs = [], ys = [];
+    polys.forEach(function (p) { p.pts.forEach(function (q) { xs.push(q[0]); ys.push(q[1]); }); });
+    (spec.circles || []).forEach(function (c) { xs.push(c[0] - c[2], c[0] + c[2]); ys.push(c[1] - c[2], c[1] + c[2]); });
+    (spec.ellipses || []).forEach(function (c) { xs.push(c[0] - c[2], c[0] + c[2]); ys.push(c[1] - c[3], c[1] + c[3]); });
+    if (spec.grid) { xs.push(0, spec.grid[0]); ys.push(0, spec.grid[1]); }
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs), y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var u = spec.u || Math.min(44, 280 / Math.max(x1 - x0, 0.1), 200 / Math.max(y1 - y0, 0.1)), P = spec.grid ? 8 : 46;
+    var X = function (v) { return f((v - x0) * u + P); }, Y = function (v) { return f((v - y0) * u + P); };
+    var W = (x1 - x0) * u + 2 * P, H = (y1 - y0) * u + 2 * P;
+    var s = svg("svg", { class: "fig fig-shape", viewBox: "0 0 " + f(W) + " " + f(H), role: "img", "aria-label": spec.label || "Shape" });
+    s.style.maxWidth = Math.round(Math.min(W * 1.25, 460)) + "px";
+    if (spec.grid) {
+      for (var gx = 0; gx <= spec.grid[0]; gx++) s.appendChild(svg("line", { x1: X(gx), y1: Y(0), x2: X(gx), y2: Y(spec.grid[1]), class: "shp-grid" }));
+      for (var gy = 0; gy <= spec.grid[1]; gy++) s.appendChild(svg("line", { x1: X(0), y1: Y(gy), x2: X(spec.grid[0]), y2: Y(gy), class: "shp-grid" }));
+    }
+    function d(p) { return p.pts.map(function (q, i) { return (i ? "L" : "M") + X(q[0]) + " " + Y(q[1]); }).join(" ") + (p.open ? "" : " Z"); }
+    polys.forEach(function (p) {
+      s.appendChild(svg("path", { d: d(p), class: "shp" + (p.tone === "w" ? " hole" : p.tone ? " tone-" + p.tone : " plain") + (p.dash ? " dash" : "") + (p.open ? " open" : "") }));
+    });
+    (spec.circles || []).forEach(function (c) { s.appendChild(svg("circle", { cx: X(c[0]), cy: Y(c[1]), r: f(c[2] * u), class: "shp plain" })); });
+    (spec.ellipses || []).forEach(function (c) { s.appendChild(svg("ellipse", { cx: X(c[0]), cy: Y(c[1]), rx: f(c[2] * u), ry: f(c[3] * u), class: "shp plain" })); });
+    (spec.dashes || []).forEach(function (l) { s.appendChild(svg("line", { x1: X(l[0]), y1: Y(l[1]), x2: X(l[2]), y2: Y(l[3]), class: "shp-dash" })); });
+    (spec.right || []).forEach(function (r) { // square corner mark at a point; r[2] like "tl" says which way the corner opens
+      var k = 9, sx = r[2].indexOf("l") >= 0 ? 1 : -1, sy = r[2].indexOf("t") >= 0 ? 1 : -1, px = X(r[0]), py = Y(r[1]);
+      s.appendChild(svg("path", { d: "M" + (px + sx * k) + " " + py + " V" + (py + sy * k) + " H" + px, class: "shp-right" }));
+    });
+    function inside(pts, x, y) {
+      var c = false;
+      for (var i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        var a = pts[i], b = pts[j];
+        if ((a[1] > y) !== (b[1] > y) && x < (b[0] - a[0]) * (y - a[1]) / (b[1] - a[1]) + a[0]) c = !c;
+      }
+      return c;
+    }
+    (spec.sides || []).forEach(function (sd) {
+      var p = polys[sd[1]].pts, a = p[sd[2]], b = p[(sd[2] + 1) % p.length], o = sd[3] || {};
+      var dx = b[0] - a[0], dy = b[1] - a[1], L = Math.sqrt(dx * dx + dy * dy), nx = dy / L, ny = -dx / L, mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2;
+      if (inside(p, mx + nx * 0.01, my + ny * 0.01) !== !!o.in) { nx = -nx; ny = -ny; }
+      var off = o.off || 12, tx = X(mx) + nx * off, ty = Y(my) + ny * off, anchor = Math.abs(nx) > 0.35 ? (nx > 0 ? "start" : "end") : "middle";
+      if (o.at) { tx = X(o.at[0]); ty = Y(o.at[1]); anchor = "middle"; }
+      s.appendChild(svg("text", { x: f(tx), y: f(ty), class: "shp-t", "text-anchor": anchor }, sd[0]));
+    });
+    (spec.ticks || []).forEach(function (t) { // [polyIndex, edgeIndex, count]
+      var p = polys[t[0]].pts, a = p[t[1]], b = p[(t[1] + 1) % p.length], dx = X(b[0]) - X(a[0]), dy = Y(b[1]) - Y(a[1]), L = Math.sqrt(dx * dx + dy * dy), ux = dx / L, uy = dy / L;
+      for (var i = 0; i < (t[2] || 1); i++) {
+        var o = (i - ((t[2] || 1) - 1) / 2) * 5, cx = (X(a[0]) + X(b[0])) / 2 + ux * o, cy = (Y(a[1]) + Y(b[1])) / 2 + uy * o;
+        s.appendChild(svg("line", { x1: f(cx - uy * 6), y1: f(cy + ux * 6), x2: f(cx + uy * 6), y2: f(cy - ux * 6), class: "shp-tick" }));
+      }
+    });
+    (spec.text || []).forEach(function (t) { s.appendChild(svg("text", { x: X(t[0]), y: Y(t[1]), class: "shp-t" + (t[3] ? " " + t[3] : ""), "text-anchor": "middle" }, t[2])); });
+    return s;
+  };
+
+  // Solids: { type: "solid", kind: "cuboid" | "cube" | "cylinder" | "cone" | "sphere", l: 4, b: 3, h: 2, labels: { l: "4 cm", b: "3 cm", h: "2 cm" } }
+  Practice.figures.solid = function (spec) {
+    var k = spec.kind, lab = spec.labels || {}, s = svg("svg", { class: "fig fig-solid", role: "img", "aria-label": k });
+    var g = svg("g", {}), box;
+    function line(a, b, dash) { g.appendChild(svg("line", { x1: f(a[0]), y1: f(a[1]), x2: f(b[0]), y2: f(b[1]), class: "sol" + (dash ? " hidden" : "") })); }
+    function txt(x, y, t, anchor) { if (t) g.appendChild(svg("text", { x: f(x), y: f(y), class: "shp-t", "text-anchor": anchor || "middle" }, t)); }
+    if (k === "cuboid" || k === "cube") {
+      var l = spec.l || 3, b = spec.b || (k === "cube" ? l : 2), h = spec.h || (k === "cube" ? l : 2);
+      var u = Math.min(150 / (l + b * 0.6), 150 / (h + b * 0.45), 40), L = l * u, B = b * u * 0.55, Hh = h * u, dx = B * 0.82, dy = -B * 0.57;
+      var A = [0, 0], Bp = [L, 0], C = [L, -Hh], D = [0, -Hh], A2 = [dx, dy], B2 = [L + dx, dy], C2 = [L + dx, dy - Hh], D2 = [dx, dy - Hh];
+      g.appendChild(svg("path", { d: "M" + [A, Bp, B2, C2, D2, D].map(function (p) { return f(p[0]) + " " + f(p[1]); }).join(" L") + " Z", class: "sol-face" }));
+      line(A2, B2, true); line(A2, D2, true); line(A, A2, true);
+      line(A, Bp); line(Bp, C); line(C, D); line(D, A); line(Bp, B2); line(B2, C2); line(C2, D2); line(D2, D); line(C, C2);
+      txt(L / 2, 18, lab.l); txt(L + dx / 2 + 6, dy / 2 + 8, lab.b, "start"); txt(L + dx + 6, dy - Hh / 2 + 4, lab.h, "start");
+      box = [-10, dy - Hh - 10, L + dx + 70, Hh - dy + 40];
+    } else if (k === "cylinder") {
+      var r = 40, hh = 90;
+      g.appendChild(svg("path", { d: "M" + -r + " 0 V" + hh + " A" + r + " 12 0 0 0 " + r + " " + hh + " V0", class: "sol-face" }));
+      g.appendChild(svg("ellipse", { cx: 0, cy: 0, rx: r, ry: 12, class: "sol-face" }));
+      g.appendChild(svg("path", { d: "M" + -r + " " + hh + " A" + r + " 12 0 0 1 " + r + " " + hh, class: "sol hidden" }));
+      box = [-r - 10, -22, 2 * r + 20, hh + 36];
+    } else if (k === "cone") {
+      var rc = 42, hc = 90;
+      g.appendChild(svg("path", { d: "M" + -rc + " 0 L0 " + hc + " L" + rc + " 0 Z", class: "sol-face" }));
+      g.appendChild(svg("ellipse", { cx: 0, cy: 0, rx: rc, ry: 12, class: "sol-face" }));
+      box = [-rc - 10, -22, 2 * rc + 20, hc + 32];
+    } else {
+      g.appendChild(svg("circle", { cx: 0, cy: 0, r: 48, class: "sol-face sphere" }));
+      g.appendChild(svg("path", { d: "M-48 0 A48 13 0 0 0 48 0", class: "sol" }));
+      g.appendChild(svg("path", { d: "M-48 0 A48 13 0 0 1 48 0", class: "sol hidden" }));
+      box = [-58, -58, 116, 116];
+    }
+    s.setAttribute("viewBox", box.map(f).join(" "));
+    s.style.maxWidth = Math.round(box[2] * 1.3) + "px";
+    s.appendChild(g);
+    return s;
+  };
+
+  // Balance: { type: "balance", left: { bags: 2, v: "x", balls: 0 }, right: { bags: 1, v: "x", balls: 4 } }
+  Practice.figures.balance = function (spec) {
+    var s = svg("svg", { class: "fig fig-balance", viewBox: "0 0 360 170", role: "img", "aria-label": "Balance" });
+    s.style.maxWidth = "380px";
+    s.appendChild(svg("path", { d: "M180 96 L166 150 H194 Z", class: "bal-stand" }));
+    s.appendChild(svg("rect", { x: 140, y: 150, width: 80, height: 8, rx: 3, class: "bal-stand" }));
+    s.appendChild(svg("rect", { x: 30, y: 92, width: 300, height: 7, rx: 3, class: "bal-stand" }));
+    function pan(cx, side) {
+      s.appendChild(svg("ellipse", { cx: cx, cy: 88, rx: 74, ry: 8, class: "bal-pan" }));
+      var n = side.bags || 0, k = side.balls || 0, BW = 26, gap = 3, total = n * (BW + gap) + (k ? Math.ceil(k / 2) * 15 + 4 : 0), x = cx - total / 2;
+      for (var i = 0; i < n; i++) {
+        var bx = x + i * (BW + gap) + BW / 2;
+        s.appendChild(svg("path", { d: "M" + (bx - 6) + " 48 l4 6 h4 l4 -6 M" + (bx - 4) + " 56 C" + (bx - 16) + " 62 " + (bx - 15) + " 84 " + bx + " 84 C" + (bx + 15) + " 84 " + (bx + 16) + " 62 " + (bx + 4) + " 56 Z", class: "bal-bag" }));
+        s.appendChild(svg("text", { x: bx, y: 72, class: "bal-v" }, side.v || "x"));
+      }
+      var bx0 = x + n * (BW + gap) + 6;
+      for (var j = 0; j < k; j++) s.appendChild(svg("circle", { cx: bx0 + Math.floor(j / 2) * 15, cy: j % 2 ? 66 : 79, r: 6.5, class: "bal-ball" }));
+    }
+    pan(92, spec.left); pan(268, spec.right);
+    return s;
+  };
+
   // Factor tree: { type: "ftree", root: { v: "18", kids: [{ v: "2" }, { v: "?a", kids: [{ v: "?b" }, { v: "3" }] }] } }
   Practice.figures.ftree = function (spec) {
     var R = 17, DX = 46, DY = 58, leaves = 0, depth = 0, nodes = [];
@@ -1045,7 +1263,7 @@
   Practice.figures.nline = function (spec) {
     var a = spec.from == null ? -10 : spec.from, b = spec.to == null ? 10 : spec.to, U = 22, W = (b - a) * U, Y = 70;
     var X = function (v) { return (v - a) * U; };
-    var s = svg("svg", { class: "fig fig-nline", viewBox: "-24 0 " + (W + 48) + " 104", role: "img", "aria-label": "Number line" });
+    var s = svg("svg", { class: "fig fig-nline", viewBox: "-24 " + (spec.range ? 30 : 0) + " " + (W + 48) + " " + (spec.range ? 74 : 104), role: "img", "aria-label": "Number line" });
     s.appendChild(svg("line", { x1: -16, y1: Y, x2: W + 16, y2: Y, class: "nl-axis" }));
     s.appendChild(svg("path", { d: "M" + (W + 18) + " " + Y + " l-8 -5 v10 z M-18 " + Y + " l8 -5 v10 z", class: "nl-head" }));
     for (var v = a; v <= b; v++) {
@@ -1062,6 +1280,13 @@
     (spec.hops || []).forEach(function (h) { hop(h[0], h[1], false); });
     if (spec.big) hop(spec.big[0], spec.big[1], true);
     (spec.dots || []).forEach(function (d) { s.appendChild(svg("circle", { cx: X(d), cy: Y, r: 4, class: "nl-dot" })); });
+    if (spec.range) { // [lo, hi, loClosed, hiClosed]; null end = arrow to that side
+      var r = spec.range, RY = Y - 22, x1 = r[0] == null ? -16 : X(r[0]), x2 = r[1] == null ? W + 16 : X(r[1]);
+      s.appendChild(svg("path", { d: "M" + x1 + " " + (r[0] == null ? RY : Y) + (r[0] == null ? "" : " V" + RY) + " H" + x2 + (r[1] == null ? "" : " V" + Y), class: "nl-range" }));
+      if (r[0] == null) s.appendChild(svg("path", { d: "M" + (x1 - 2) + " " + RY + " l9 -5 v10 z", class: "nl-rhead" }));
+      if (r[1] == null) s.appendChild(svg("path", { d: "M" + (x2 + 2) + " " + RY + " l-9 -5 v10 z", class: "nl-rhead" }));
+      [[r[0], r[2]], [r[1], r[3]]].forEach(function (e) { if (e[0] != null) s.appendChild(svg("circle", { cx: X(e[0]), cy: Y, r: 5.5, class: "nl-end" + (e[1] ? " closed" : "") })); });
+    }
     return s;
   };
 

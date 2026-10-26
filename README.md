@@ -1,6 +1,6 @@
 # Angle Quest
 
-A practice game for Grade 6 maths: sets (Exercises 1.1–1.2), operations on whole numbers (Exercises 2.1–2.3), properties of whole numbers (Exercises 3.1–3.4), integers (Exercise 4.1), fractions (Exercises 5.1–5.4), decimals (Exercises 6.1–6.5), percent (Exercises 7.1–7.2), unitary method (Exercise 8.1), profit and loss (Exercise 9.1), algebraic expressions (Exercises 10.1–10.7), coordinates (Exercise 12.1), point and line (Exercise 13.1), angles (Exercises 14.1–14.3) and triangles, quadrilaterals and circles (Exercises 15.1–15.4), with step-by-step help on every problem.
+A practice game for Grade 6 maths: sets (Exercises 1.1–1.2), operations on whole numbers (Exercises 2.1–2.3), properties of whole numbers (Exercises 3.1–3.4), integers (Exercise 4.1), fractions (Exercises 5.1–5.4), decimals (Exercises 6.1–6.5), percent (Exercises 7.1–7.2), unitary method (Exercise 8.1), profit and loss (Exercise 9.1), algebraic expressions (Exercises 10.1–10.7), equations and inequalities (Exercises 11.1–11.5), coordinates (Exercise 12.1), point and line (Exercise 13.1), angles (Exercises 14.1–14.3) and triangles, quadrilaterals and circles (Exercises 15.1–15.4), and perimeter, area and volume (Exercises 17.1–17.5), and statistics (Exercises 19.1–19.3), with step-by-step help on every problem.
 
 It is a plain static site: no build step and no server code.
 
