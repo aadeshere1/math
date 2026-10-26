@@ -131,6 +131,8 @@ New drawing types for other subjects can be added in `engine.js` as `Practice.fi
 - `Practice.eq.solve(id, "3x - 4 = 2x + 5", opts)` builds a whole question with worked help: simplify each side, clear fractions by the L.C.M., move the letter terms, move the numbers, divide, then check. The answer is a number, or a fraction if it is not whole. `opts`: `prompt`, `label`, `unit`, `intro`, `outro`, `check: false`, `answerText`, `cross`. The returned question also has `value` ([numerator, denominator]).
 - `Practice.eq.sides(expr)` gives `{ v, op, a, b, c, d }` for a x + b (op) c x + d, as fractions. `Practice.eq.lin(a, b, "x")` writes a x + b nicely.
 
-## Fish sea (aquarium.js)
+## Fish sea (aquarium.js, aquarium.css)
 
 The home page opens with a sea. Each chapter is one fish, found from the lesson title ("Exercise 3.2" is Chapter 3). A fish hatches when any exercise of its chapter is started (a question answered or help used), so chapters not yet taught stay out of the sea. It grows with every solved question in its chapter and passes five stages at 0%, 25%, 50%, 75% and 100%: Tiny fry, Little fish, Growing fish, Big fish and King fish (with a crown). Points are called pearls, and pearls unlock sea friends (shell, crab, turtle and more; the list is `FRIENDS` in aquarium.js). The streak counts days in a row with at least one solved question. All of it lives in the browser's storage, like the rest of the progress. New lessons need nothing extra: they join their chapter's fish by their title.
+
+Science lessons (science.html) share the same sea, pearls and streak, but each science lesson is a bird flying in the sky above the water, with stages Tiny chick, Little bird, Growing bird, Big bird and King bird. Each page remembers its own creatures in `sea:summary`, so the maths page also shows the science birds (and the other way round) with a link to the page where they can be fed.

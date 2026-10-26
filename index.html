@@ -6,6 +6,7 @@
 <title>Angle Quest</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<link rel="stylesheet" href="aquarium.css">
 <style>
 /* Layout: graph-paper desk; question card in the middle, exercise list beside it (stacks on phones). */
 :root {
@@ -319,62 +320,16 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .stars { font-size: 3rem; color: var(--accent); letter-spacing: .1em; line-height: 1; }
 .confirm { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: var(--bad-wash); padding: 10px 14px; border-radius: 10px; }
 
-/* ---------- fish sea ---------- */
-.sea-wrap { margin: 0 0 30px; }
-.sea-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 20px; margin-bottom: 12px; }
-.sea-head h2 { font-size: clamp(1.6rem, 4vw, 2.2rem); }
-.sea-sub { margin: 4px 0 0; color: var(--ink-soft); max-width: 46ch; font-size: .95rem; }
-.sea-chips { display: flex; flex-wrap: wrap; gap: 8px; }
-.sea-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--card); border: 1px solid var(--line); border-radius: 999px; padding: 6px 14px; font-size: .9rem; color: var(--ink-soft); }
-.sea-chip b { font-family: var(--f-display); font-size: 1.15rem; color: var(--ink); font-variant-numeric: tabular-nums; }
-.sea-chip.hot b { color: #e8590c; }
-.sea-chip.next { border-radius: 16px; padding: 6px 12px; }
-.sea-next-e { font-size: 1.6rem; filter: grayscale(1); opacity: .55; }
-.sea-next-t { display: grid; gap: 3px; color: var(--ink); font-weight: 700; font-size: .82rem; }
-.sea-mini { display: block; width: 130px; height: 6px; border-radius: 9px; background: var(--paper); overflow: hidden; }
-.sea-mini > span { display: block; height: 100%; background: linear-gradient(90deg, #2f9bd6, #20c4b0); }
-.sea-mini-t { font-weight: 400; color: var(--ink-soft); font-size: .78rem; }
-.sea-toast { background: #fff7d6; color: #4a3500; border: 2px solid #f2b31b; border-radius: var(--r); padding: 8px 14px; margin-bottom: 12px; font-weight: 700; animation: seaPop .5s ease-out; }
-.sea-toast p { margin: 2px 0; }
-.sea-box { position: relative; height: clamp(380px, 46vw, 460px); border-radius: 22px; overflow: hidden; box-shadow: 0 10px 30px rgba(14, 76, 140, .25), inset 0 0 0 3px rgba(255, 255, 255, .35); background: #2f9bd6; }
-.sea { display: block; width: 100%; height: 100%; }
-.sea-fish, .sea-tag { cursor: pointer; }
-.sea-tag text { font: 800 13px var(--f-display); }
-.sea-friend { pointer-events: none; }
-.sea-ray { opacity: .07; animation: seaRay 7s ease-in-out infinite alternate; }
-.sea-ray.r1 { animation-delay: -2s; } .sea-ray.r2 { animation-delay: -4s; } .sea-ray.r3 { animation-delay: -6s; }
-.sea-weed { transform-box: fill-box; transform-origin: 50% 100%; animation: seaSway 4s ease-in-out infinite alternate; }
-.sea-weed.w1 { animation-duration: 5s; animation-delay: -1s; } .sea-weed.w2 { animation-duration: 3.4s; animation-delay: -2s; }
-.sea-card { position: absolute; left: 12px; bottom: 12px; width: min(330px, calc(100% - 24px)); background: var(--card); color: var(--ink); border-radius: 18px; padding: 14px 16px 16px; box-shadow: 0 10px 30px rgba(0, 0, 0, .3); animation: seaPop .25s ease-out; }
-.sea-card[hidden] { display: none; }
-.sea-x { position: absolute; top: 6px; right: 8px; border: 0; background: none; font-size: 1.6rem; line-height: 1; color: var(--ink-soft); padding: 4px 8px; cursor: pointer; }
-.sea-card-top { display: flex; align-items: center; gap: 10px; }
-.sea-card-name { margin: 0; font: 800 1.3rem/1.1 var(--f-display); }
-.sea-card-ch { margin: 0; color: var(--ink-soft); font-size: .85rem; }
-.sea-stage { margin: 10px 0 4px; font-weight: 700; color: var(--blue); }
-.sea-meter { display: block; height: 10px; border-radius: 9px; background: var(--paper); overflow: hidden; }
-.sea-meter > span { display: block; height: 100%; border-radius: 9px; }
-.sea-card-st { margin: 6px 0 2px; font-size: .85rem; color: var(--ink-soft); }
-.sea-card-say { margin: 6px 0 12px; font-style: italic; }
-.sea-dot { display: inline-grid; place-items: center; min-width: 24px; height: 24px; padding: 0 4px; border-radius: 99px; background: var(--fc, var(--blue)); color: #fff; font: 800 .8rem var(--f-display); text-shadow: 0 1px 1px rgba(0,0,0,.25); }
-.sea-dot.big { min-width: 40px; height: 40px; font-size: 1.15rem; }
-.sea-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
-.sea-pill { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 999px; padding: 3px 12px 3px 3px; font-size: .82rem; cursor: pointer; }
-.sea-pill:hover { border-color: var(--fc); }
-.sea-pill .sea-dot { background: var(--fc); }
-.sea-empty { position: absolute; inset: 0 0 70px; display: grid; place-content: center; text-align: center; color: #fff; padding: 16px; text-shadow: 0 1px 3px rgba(0, 0, 0, .35); pointer-events: none; }
-.sea-empty p { margin: 2px 0; font: 800 clamp(1.1rem, 3vw, 1.5rem) var(--f-display); }
-.sea-empty .sea-empty-s { font: 400 1rem var(--f-body); }
-.sea-empty .sea-empty-e { font-size: 3rem; animation: seaSway 1.6s ease-in-out infinite alternate; }
-.sea-fb { display: block; margin-top: 4px; font-weight: 400; }
-@keyframes seaSway { from { transform: rotate(-6deg); } to { transform: rotate(6deg); } }
-@keyframes seaRay { from { opacity: .03; } to { opacity: .12; } }
-@keyframes seaPop { from { transform: scale(.92); opacity: 0; } to { transform: none; opacity: 1; } }
-@media (prefers-reduced-motion: reduce) { .sea-weed, .sea-ray, .sea-toast, .sea-card { animation: none; } }
+/* ---------- subject switch (Maths | Science) ---------- */
+.site-nav { max-width: 1120px; margin: 0 auto; padding: 12px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); display: flex; gap: 8px; }
+.site-nav a { text-decoration: none; color: var(--ink); font-weight: 700; padding: 6px 16px; border-radius: 999px; border: 2px solid var(--line); background: var(--card); }
+.site-nav a[aria-current="page"] { background: var(--ink); color: var(--card); border-color: var(--ink); }
+.site-nav a:hover { border-color: var(--blue); }
 </style>
 </head>
 <body>
 
+<nav class="site-nav" aria-label="Subjects"><a href="index.html" aria-current="page">📐 Maths</a><a href="science.html">🔬 Science</a></nav>
 <div id="app"></div>
 
 <!-- Engine first, then one script per lesson. Add new lessons here. -->
