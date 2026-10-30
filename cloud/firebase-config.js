@@ -25,4 +25,12 @@
   Optional, for testing on a computer with the Firebase emulators only:
   window.ANGLE_FIREBASE_EMULATOR = { auth: "http://127.0.0.1:9099", host: "127.0.0.1", port: 8080 };
 */
-window.ANGLE_FIREBASE = null;
+window.ANGLE_FIREBASE = {
+  apiKey: "AIzaSyCqfklrqSMWANmdwu-Sy4lLbBRivGCp4wU",
+  authDomain: "study-aec80.firebaseapp.com",
+  projectId: "study-aec80",
+  storageBucket: "study-aec80.firebasestorage.app",
+  messagingSenderId: "423805045850",
+  appId: "1:423805045850:web:1519992f1d7aaed9049c63",
+  measurementId: "G-V1KK26KVDT"
+};
