@@ -294,6 +294,113 @@
 .pc-name { font-size: 1.05rem; } .pc-note { color: var(--ink-soft); font-size: .84rem; margin-top: 3px; }
 @keyframes twinkle { 50% { opacity: .25; } }
 @media (prefers-reduced-motion: reduce) { .star, .ray-line, .drift, .planet-card, .egg-cap, .crater.boom { animation: none !important; transition: none !important; } }
+/* Living organisms pictures (figures-life.js) */
+.lf-grass { fill: #8fd08f; }
+.lf-sky2 { fill: #bfe6ff; }
+.lf-hotsky { fill: #ffe7b8; }
+.lf-coldsky { fill: #dfeefa; }
+.lf-cl { fill: #fff; opacity: .95; }
+.lf-water { fill: #4f9fe0; }
+.lf-wave { fill: none; stroke: #d7f0ff; stroke-width: 2; }
+.lf-bubble { fill: none; stroke: #e6f6ff; stroke-width: 1.2; animation: lf-bubble 3.5s linear infinite; }
+.lf-stem { fill: none; stroke: #2f8a3c; stroke-width: 2.5; stroke-linecap: round; }
+.lf-tiny { fill: none; stroke: #4cbf5a; stroke-width: 2; stroke-linecap: round; }
+.lf-pad { fill: #3fa34d; stroke: #2f7a3a; }
+.lf-root { stroke-width: 2.5; }
+.lf-mtn { fill: #9fb3c8; }
+.lf-cap { fill: #fff; }
+.lf-snowg { fill: #f6fbff; }
+.lf-flake { fill: #fff; stroke: #c6d8e8; stroke-width: .4; animation: lf-snow 5s linear infinite; }
+.lf-flake.big { animation: none; }
+.lf-trunk { fill: #8a5a33; }
+.lf-branch { fill: none; stroke: #8a5a33; stroke-width: 6; stroke-linecap: round; }
+.lf-leaves { fill: #3fa34d; }
+.lf-tail { stroke: #7a4a22; stroke-width: 3; stroke-linecap: round; }
+.lf-wall { fill: #d98c5f; }
+.lf-brick { stroke: #f4d2bd; stroke-width: 1.5; fill: none; }
+.lf-mound { fill: #8a6040; }
+.lf-tunnel { fill: none; stroke: #a07850; stroke-width: 16; stroke-linecap: round; }
+.lf-hole { fill: #a07850; }
+.lf-sand { fill: #f1c98a; } .lf-sand2 { fill: #e7b56d; }
+.lf-heat { stroke: #f0a040; stroke-width: 2; fill: none; }
+.lf-speed { stroke: #fff; stroke-width: 2; }
+.lf-rock { fill: #8b8f96; }
+.lf-pole { fill: #8a5a33; }
+.lf-vine { fill: none; stroke: #2f8a3c; stroke-width: 3; stroke-linecap: round; stroke-dasharray: 400; }
+.lf-tendril { fill: none; stroke: #5cc06a; stroke-width: 1.5; }
+.lf-pot { fill: #c46d3b; }
+.lf-aloe { fill: #6aa86f; stroke: #3f7a44; stroke-width: 1; }
+.lf-leafy { fill: #3fa34d; stroke: #2f7a3a; stroke-width: 1; }
+.lf-bag { fill: rgba(255,255,255,.35); stroke: #9fb3c8; stroke-width: 1.5; }
+.lf-tie { stroke: #c0392b; stroke-width: 3; }
+.lf-drop { transition: opacity .5s; }
+.lf-pine { fill: #2f7a3a; }
+.lf-pile { fill: #fff; stroke: #c6d8e8; stroke-width: 2; }
+.lf-snowcap { fill: #fff; stroke: #c6d8e8; transform-box: fill-box; transform-origin: 50% 100%; }
+.lf-bend { transform-box: view-box; transform-origin: 276px 132px; transition: transform 1s ease-in; }
+.lf-bend.bent { transform: rotate(16deg); }
+.lf-crack { fill: none; stroke: #1b2a3a; stroke-width: 1.5; }
+.sfig .lbl.lf-tag { font-size: 10px; fill: #1b2a3a; paint-order: stroke; stroke: rgba(255,255,255,.85); stroke-width: 3px; }
+.sfig .lbl.lf-tag.big { font-size: 12px; font-weight: 800; }
+.sfig .lbl.lf-tag.light { fill: #fff; stroke: rgba(0,0,0,.45); }
+.sfig .lbl.lf-tagbg { paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 3px; }
+/* fish */
+.lf-fishfig { background: #bfe3fb; }
+.lf-fishb { fill: #9fb8cc; stroke: #4d6073; stroke-width: 1.5; }
+.lf-fin { fill: #7f9db6; stroke: #4d6073; stroke-width: 1; }
+.lf-scale { fill: none; stroke: #6b8399; stroke-width: 1; }
+.lf-gill { fill: none; stroke: #c0392b; stroke-width: 2.2; stroke-linecap: round; }
+.lf-eye { fill: #fff; stroke: #4d6073; }
+.lf-lead { stroke: #1b2a3a; stroke-width: 1; }
+.lf-flowline { fill: none; stroke: #fff; stroke-width: 2; stroke-dasharray: 8 8; opacity: .7; }
+.swimming .lf-flowline { animation: flow .6s linear infinite reverse; opacity: 1; }
+.swimming .lf-fishbody { animation: lf-wiggle .5s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: 30% 50%; }
+.lf-fishfig .hl { fill: #ffd23f; stroke: #b88a00; } .lf-gill.hl { fill: none; stroke: #e67e22; stroke-width: 4; }
+/* parts */
+.lf-anatomy { display: grid; grid-template-columns: minmax(110px, 160px) 1fr; gap: 12px; align-items: center; width: 100%; }
+.lf-anatomy.small { grid-template-columns: 80px 1fr; max-width: 420px; }
+@media (max-width: 520px) { .lf-anatomy { grid-template-columns: 1fr; } }
+.lf-hero { display: grid; justify-items: center; background: var(--blue-wash); border-radius: 16px; padding: 10px; }
+.lf-hero-e { font-size: 4.2rem; line-height: 1.1; animation: bob 2.6s ease-in-out infinite; }
+.lf-anatomy.small .lf-hero-e { font-size: 2.6rem; }
+.lf-parts { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 8px; }
+.lf-part { display: grid; grid-template-columns: 2.2rem 1fr; gap: 8px; align-items: center; text-align: left; background: var(--paper); border: 2px solid var(--line); border-radius: 12px; padding: 8px 10px; color: var(--ink); animation: rise .4s ease-out both; animation-delay: var(--d, 0s); }
+.lf-part:hover { border-color: var(--blue); }
+.lf-part > span:last-child { display: grid; }
+.lf-part-e { font-size: 1.6rem; }
+.lf-parts.small .lf-part { padding: 4px 8px; font-size: .85rem; }
+/* lettered pictures */
+.lf-bg-pond { background: linear-gradient(#cdeefd, #4f9fe0); } .lf-bg-snow { background: linear-gradient(#dfeefa, #ffffff); }
+.lf-bg-sand { background: linear-gradient(#ffe7b8, #e7b56d); } .lf-bg-field { background: linear-gradient(#cdeefd, #8fd08f); }
+.lf-bg-skyb { background: linear-gradient(#9fd4ff, #e6f4ff); } .lf-bg-forest { background: linear-gradient(#cdeefd, #3fa34d); }
+.lf-bg-soil { background: linear-gradient(#8fd08f 30%, #8a6040 30%); }
+/* motion */
+.lf-swim { animation: lf-across 9s linear infinite; }
+.lf-run { animation: lf-across 4.5s linear infinite; }
+.lf-walk { animation: lf-across 16s linear infinite; }
+.lf-fly { animation: lf-flyk 10s linear infinite; }
+.lf-pace { animation: lf-pace 4s ease-in-out infinite alternate; }
+.lf-bob { animation: bob 2.6s ease-in-out infinite; }
+.lf-hop { animation: lf-hop 3s ease-in-out infinite; }
+.lf-jump { animation: lf-jump 3.5s ease-in-out infinite; }
+.lf-climb { animation: lf-climb 5s ease-in-out infinite alternate; }
+.lf-swing { animation: lf-swing 2.4s ease-in-out infinite alternate; transform-box: view-box; transform-origin: 200px 98px; }
+.lf-cloud { animation: lf-drift 24s ease-in-out infinite alternate; }
+@keyframes lf-across { from { transform: translateX(0); } to { transform: translateX(-480px); } }
+@keyframes lf-flyk { 0% { transform: translate(0, 0); } 25% { transform: translate(-120px, -12px); } 50% { transform: translate(-240px, 4px); } 75% { transform: translate(-360px, -10px); } 100% { transform: translate(-480px, 0); } }
+@keyframes lf-pace { from { transform: translateX(0); } to { transform: translateX(-40px); } }
+@keyframes lf-hop { 0%, 60%, 100% { transform: translate(0, 0); } 75% { transform: translate(-8px, -22px); } }
+@keyframes lf-jump { 0%, 55%, 100% { transform: translate(0, 40px); opacity: 0; } 65% { opacity: 1; } 78% { transform: translate(-40px, -30px); opacity: 1; } 92% { transform: translate(-80px, 30px); opacity: 1; } }
+@keyframes lf-climb { from { transform: translateY(0); } to { transform: translateY(-50px); } }
+@keyframes lf-swing { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+@keyframes lf-drift { from { transform: translateX(-20px); } to { transform: translateX(30px); } }
+@keyframes lf-snow { from { transform: translateY(0); } to { transform: translateY(240px); } }
+@keyframes lf-bubble { from { transform: translateY(0); opacity: .9; } to { transform: translateY(-110px); opacity: 0; } }
+@keyframes lf-wiggle { from { transform: rotate(-2deg); } to { transform: rotate(2deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .lf-swim, .lf-run, .lf-walk, .lf-fly, .lf-pace, .lf-bob, .lf-hop, .lf-jump, .lf-climb, .lf-swing, .lf-cloud, .lf-flake, .lf-bubble, .lf-hero-e, .lf-part, .swimming .lf-flowline, .swimming .lf-fishbody { animation: none !important; }
+  .lf-flake { display: none; }
+}
 </style>
 </head>
 <body>
@@ -304,6 +411,8 @@
 <script src="cloud/sync.js"></script>
 <script src="shared.js"></script>
 <script src="science.js"></script>
+<script src="science/figures-life.js"></script>
+<script src="science/adaptation-g6-3-1.js"></script>
 <script src="science/figures-earth.js"></script>
 <script src="science/soil-g6-11-1.js"></script>
 <script src="science/figures-space.js"></script>

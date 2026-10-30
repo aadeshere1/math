@@ -10,6 +10,8 @@ Progress is saved in the browser under `science:<lesson id>`, apart from maths p
 - `science/figures-*.js`: picture packs. Each one adds drawings to `Science.figures`. `figures-earth.js` has the soil pictures: `field`, `jar`, `formation`, `humus`, `soiltypes`, `profile`, `pollution`, `acidrain`, `erosion`, `trays`, `terrace`, `cards`, `flow`, `methods`, `mindmap` and `scenes`.
 - `science/<lesson>.js`: lesson data only, registered with `Science.register({...})`.
 
+`figures-life.js` has the living organisms pictures: `habit` (habitat scenes: `home`, `aquatic`, `cursorial`, `arboreal`, `aerial`, `fossorial`, `desert`, `polar`, `waterplants`, `mesophyte`, `xerophyte`, `cold`, `creepers`; one with `k`, or tabs with `only` or `set: "animals" | "plants"`), `parts` (an animal or plant with tappable adaptive parts), `fish` (labelled fish, `letters` for A–E), `bags` (Activity 3.9), `pinesnow` (cone-shaped pine in snow) and `lettered` (pictures marked A, B, C… for identify questions).
+
 To add a chapter, add its lesson file (and a picture pack if it needs new drawings) to `science.html`, after `science/figures-earth.js`.
 
 ## Lesson format
