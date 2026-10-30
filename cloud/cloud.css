@@ -1,0 +1,34 @@
+/* Cloud save: the chip in the top bar and its dialog (student pages). */
+.site-nav { align-items: center; }
+.cloud-chip { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font: inherit; font-weight: 700; font-size: .92rem;
+  color: var(--ink); background: var(--card); border: 2px solid var(--line); border-radius: 999px; padding: 5px 14px; cursor: pointer; max-width: 50vw; }
+.cloud-chip .cloud-t { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-chip:hover { border-color: var(--blue); }
+.cloud-chip.is-ok { border-color: var(--good); }
+.cloud-chip.is-ok::after { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--good); flex: none; }
+.cloud-chip.is-sync .cloud-i { animation: cloudPulse 1.2s ease-in-out infinite; }
+.cloud-chip.is-offline, .cloud-chip.is-signin, .cloud-chip.is-denied { border-color: var(--accent); }
+@keyframes cloudPulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .cloud-chip.is-sync .cloud-i { animation: none; } }
+@media (max-width: 420px) { .cloud-chip { padding: 5px 10px; } .cloud-chip.is-off .cloud-t { display: none; } }
+
+.cloud-dlg { width: min(440px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; border: 0; border-radius: 18px; padding: 22px 20px 16px;
+  background: var(--card); color: var(--ink); box-shadow: 0 20px 60px rgba(0, 0, 0, .3); font: 16px/1.5 var(--f-body, system-ui); }
+.cloud-dlg::backdrop { background: rgba(10, 20, 30, .45); }
+.cloud-dlg h2 { font-family: var(--f-display, inherit); font-size: 1.3rem; margin: 0 28px 6px 0; }
+.cloud-dlg h3 { font-size: 1rem; margin: 0 0 4px; }
+.cloud-x { position: absolute; top: 10px; right: 12px; border: 0; background: none; color: var(--ink-soft); font-size: 1.6rem; line-height: 1; cursor: pointer; padding: 4px 8px; }
+.cloud-p { margin: 0 0 10px; }
+.cloud-p.soft { color: var(--ink-soft); font-size: .92rem; }
+.cloud-sec { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; }
+.cloud-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin: 6px 0; }
+.cloud-code, .cloud-name { font: inherit; border: 2px solid var(--line); border-radius: 10px; padding: 6px 10px; background: var(--card); color: var(--ink); min-width: 0; }
+.cloud-code { width: 9.5ch; font-size: 1.25rem; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; font-variant-numeric: tabular-nums; }
+.cloud-name { flex: 1 1 140px; }
+.cloud-code:focus, .cloud-name:focus { border-color: var(--blue); outline: none; }
+.cloud-kids { display: flex; gap: 8px; flex-wrap: wrap; }
+.cloud-kids > .cloud-row { flex-basis: 100%; }
+.cloud-msg { margin: 10px 0 0; font-weight: 700; color: var(--ink-soft); }
+.cloud-msg.bad { color: var(--bad); }
+.cloud-foot { margin: 14px 0 0; font-size: .92rem; text-align: right; }
+.cloud-foot a { color: var(--blue); font-weight: 700; }

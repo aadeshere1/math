@@ -468,12 +468,12 @@
 
   /* 15. Key concepts map */
   F.mindmap = function (spec, opts) {
-    var items = [
+    var items = spec.items || [
       ["What", "Weathered rock is soil."], ["Formation", "Rocks break (weathering). Soil has minerals."],
       ["Profile", "Humus, topsoil, subsoil, weathered rock, bedrock."], ["Pollution", "Waste, volcano, industry, mining, acid rain, farm chemicals."],
       ["Erosion", "Removing soil. Deposition: collecting it in a new place."], ["Conservation", "Mulching, cover cropping, mixed farming, crop rotation, less tillage, terraces."]
     ];
-    return el("div", { class: "mind" + (opts.small ? " small" : "") }, [el("div", { class: "mind-c", text: "Soil" })].concat(items.map(function (it, i) {
+    return el("div", { class: "mind" + (opts.small ? " small" : "") }, [el("div", { class: "mind-c", text: spec.center || "Soil" })].concat(items.map(function (it, i) {
       return el("div", { class: "mind-i", style: "--d:" + (i * 0.15) + "s" }, [el("b", { text: it[0] }), el("span", { text: it[1] })]);
     })));
   };

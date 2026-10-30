@@ -1,0 +1,121 @@
+rules_version = '2';
+
+/*
+  Security rules for Angle Quest cloud save (cloud/sync.js and cloud/parent.js).
+  Paste this into Firebase console > Firestore Database > Rules, then Publish.
+
+  Who is who:
+    Parent  signs in with Google. Their uid is the family id: families/{parentUid}.
+    Device  a child's phone or computer. It signs in anonymously and is let into one
+            child by a pairing code; it is then listed in that child's `members` map.
+
+  Data (see the comment at the top of cloud/sync.js):
+    families/{p}                                 the parent's account
+    families/{p}/children/{c}                    { name, members: { deviceUid: true }, created, lastActive, pairCode }
+    families/{p}/children/{c}/store/{key}        { k, v, ts }   one saved localStorage key
+    families/{p}/children/{c}/days/{yyyy-mm-dd}  { d, minutes, solved, points }
+    pairs/{code}                                 { p, c, name, exp }   six-letter code, valid 30 minutes
+*/
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    /* ---------- helpers ---------- */
+    function signedIn() { return request.auth != null; }
+    function isAnon() { return signedIn() && request.auth.token.firebase.sign_in_provider == 'anonymous'; }
+    // The parent who owns family p (a real, non-anonymous account).
+    function isParent(p) { return signedIn() && !isAnon() && request.auth.uid == p; }
+    function childPath(p, c) { return /databases/$(database)/documents/families/$(p)/children/$(c); }
+    // A device that was linked to child c with a pairing code.
+    function isMember(p, c) {
+      return signedIn() && exists(childPath(p, c)) &&
+        get(childPath(p, c)).data.get('members', {}).get(request.auth.uid, false) == true;
+    }
+    function canUseChild(p, c) { return isParent(p) || isMember(p, c); }
+    function validName(n) { return n is string && n.size() > 0 && n.size() <= 30; }
+
+    /* ---------- pairing codes ---------- */
+    match /pairs/{code} {
+      // Only a parent makes codes, for one of their own children, valid for at most ~31 minutes.
+      // `create` (not `update`) means an existing code is never overwritten: parent.js retries
+      // with a new code when this is refused.
+      allow create: if isParent(request.resource.data.p)
+        && code.matches('^[A-HJ-NP-Z2-9]{6}$')
+        && request.resource.data.keys().hasOnly(['p', 'c', 'name', 'exp'])
+        && request.resource.data.c is string
+        && validName(request.resource.data.name)
+        && request.resource.data.exp is timestamp
+        && request.resource.data.exp > request.time
+        && request.resource.data.exp < request.time + duration.value(31, 'm')
+        && exists(childPath(request.resource.data.p, request.resource.data.c));
+
+      // A device that types the code may read that one code. Listing all codes is not allowed.
+      allow get: if signedIn();
+      allow list: if false;
+
+      // Removed by the parent, or by the device once it has used the code.
+      allow delete: if signedIn()
+        && (isParent(resource.data.p) || isMember(resource.data.p, resource.data.c));
+      allow update: if false;
+    }
+
+    /* ---------- families ---------- */
+    match /families/{p} {
+      allow read, write: if isParent(p);
+
+      match /children/{c} {
+        allow read: if canUseChild(p, c);
+        allow delete: if isParent(p);
+
+        // The parent adds a child: { name, members: {}, created }.
+        allow create: if isParent(p)
+          && validName(request.resource.data.name)
+          && request.resource.data.members is map;
+
+        allow update: if
+          // The parent may change anything (rename, remove a device, and so on).
+          isParent(p)
+
+          // A device joins with a valid, unexpired code made for this child. It may only
+          // add itself to `members` and note the code it used.
+          || (signedIn()
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['members', 'pairCode'])
+              && request.resource.data.members.diff(resource.data.get('members', {})).affectedKeys().hasOnly([request.auth.uid])
+              && request.resource.data.members[request.auth.uid] == true
+              && request.resource.data.pairCode is string
+              && exists(/databases/$(database)/documents/pairs/$(request.resource.data.pairCode))
+              && get(/databases/$(database)/documents/pairs/$(request.resource.data.pairCode)).data.p == p
+              && get(/databases/$(database)/documents/pairs/$(request.resource.data.pairCode)).data.c == c
+              && get(/databases/$(database)/documents/pairs/$(request.resource.data.pairCode)).data.exp > request.time)
+
+          // A linked device only touches `lastActive`.
+          || (isMember(p, c)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastActive'])
+              && request.resource.data.lastActive == request.time);
+
+        // One saved progress key: { k, v (JSON text), ts (server time) }.
+        match /store/{key} {
+          allow read: if canUseChild(p, c);
+          allow create, update: if canUseChild(p, c)
+            && request.resource.data.keys().hasOnly(['k', 'v', 'ts'])
+            && request.resource.data.k is string && request.resource.data.k.size() <= 200
+            && request.resource.data.v is string && request.resource.data.v.size() <= 900000
+            && request.resource.data.ts == request.time;
+          allow delete: if isParent(p);
+        }
+
+        // Daily totals, written with increments: { d, minutes, solved, points }.
+        match /days/{day} {
+          allow read: if canUseChild(p, c);
+          allow create, update: if canUseChild(p, c)
+            && day.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$')
+            && request.resource.data.keys().hasOnly(['d', 'minutes', 'solved', 'points'])
+            && request.resource.data.d == day
+            && request.resource.data.get('minutes', 0) is number
+            && request.resource.data.get('solved', 0) is number
+            && request.resource.data.get('points', 0) is number;
+          allow delete: if isParent(p);
+        }
+      }
+    }
+  }
+}

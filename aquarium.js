@@ -12,7 +12,10 @@
 */
 (function () {
   "use strict";
-  var P = window.Practice || null, SC = window.Science || null; if (!P && !SC) return;
+  var P = window.Practice || null, SC = window.Science || null;
+  // VIEW: set by SeaView.render on the parent page. Then the sea is drawn from a child's saved
+  // progress (VIEW.store), read only: nothing is saved and nothing is picked at random.
+  var VIEW = null;
   var NS = "http://www.w3.org/2000/svg";
 
   function S(tag, a, kids) {
@@ -33,6 +36,7 @@
     return n;
   }
   function store(k, v) {
+    if (VIEW) return v === undefined ? (VIEW.store[k] === undefined ? null : JSON.parse(JSON.stringify(VIEW.store[k]))) : null;
     try {
       if (v === undefined) return JSON.parse(localStorage.getItem(k) || "null");
       localStorage.setItem(k, JSON.stringify(v));
@@ -96,12 +100,15 @@
   // Chapters from the engine on this page
   function liveChapters() {
     var out = [];
+    var pStats = VIEW ? function (l) { return VIEW.stats(l, "Maths"); } : P && P.stats;
+    var sStats = VIEW ? function (l) { return VIEW.stats(l, "Science"); } : SC && SC.stats;
+    if (VIEW && !VIEW.stats) return out;
     if (P) {
       var map = {}, ms = [];
       P.lessons.forEach(function (l) {
         var n = chapterNum(l), key = n != null ? "c" + n : "u" + (l.unit || l.title);
         if (!map[key]) { map[key] = { subject: "Maths", num: n, unit: l.unit || l.title, lessons: [], done: 0, total: 0, points: 0, tried: 0, open: P.open, stats: P.stats }; ms.push(map[key]); }
-        var c = map[key], st = P.stats(l);
+        var c = map[key], st = pStats(l);
         c.lessons.push(l); c.done += st.done; c.total += st.total; c.points += st.points; c.tried += st.tried || 0;
       });
       ms.sort(function (a, b) { return (a.num == null ? 999 : a.num) - (b.num == null ? 999 : b.num); });
@@ -113,7 +120,7 @@
     }
     if (SC) {
       SC.lessons.forEach(function (l, i) {
-        var st = SC.stats(l), m = /^(\d+(?:\.\d+)?)/.exec(l.title || "");
+        var st = sStats(l), m = /^(\d+(?:\.\d+)?)/.exec(l.title || "");
         out.push({ subject: "Science", key: "sci:" + l.id, label: m ? m[1] : "S" + (i + 1), idx: 20 + hashIdx(l.id, 10), order: 1000 + i,
           unit: l.title, title: "Science · " + l.title, short: "Science " + (m ? m[1] : l.title), page: "science.html", lessonId: l.id,
           lessons: [l], done: st.done, total: st.total, points: st.points, tried: st.tried || 0, open: SC.open, stats: SC.stats });
@@ -448,6 +455,7 @@
     var all = store("sea:species") || {}, cur = all[c.key], tier = c.tier, pool = POOLS[kind(c)][tier];
     if (cur && cur.t === tier && SPECIES[cur.s]) return SPECIES[cur.s];
     if (!c.started) return null;
+    if (VIEW) { var id0 = cur && SPECIES[cur.s] ? cur.s : pool[hashIdx(c.key, pool.length)]; return SPECIES[id0]; }
     var used = {}; Object.keys(all).forEach(function (k) { if (k !== c.key) used[all[k].s] = (used[all[k].s] || 0) + 1; });
     var least = Math.min.apply(null, pool.map(function (s) { return used[s] || 0; }));
     var pick = pool.filter(function (s) { return (used[s] || 0) === least; });
@@ -468,7 +476,7 @@
   function render() {
     var all = chapters(), pearls = totalPoints(all);
     var chs = all.filter(function (c) { return c.started; });
-    var memo = store("practice:sea") || null;
+    var memo = VIEW ? null : store("practice:sea") || null;
     var grown = [], friendsNew = [], hatched = [], revealed = [];
     var unlocked = FRIENDS.filter(function (f) { return pearls >= f.at; });
     if (memo) {
@@ -477,14 +485,15 @@
       if (memo.fish) chs.forEach(function (c) { if (memo.fish.indexOf(c.key) < 0) hatched.push(c); });
     }
     var stages = {}; chs.forEach(function (c) { stages[c.key] = c.stage; });
-    store("practice:sea", { stages: stages, pearls: pearls, fish: chs.map(function (c) { return c.key; }) });
+    if (!VIEW) store("practice:sea", { stages: stages, pearls: pearls, fish: chs.map(function (c) { return c.key; }) });
 
     var kings = chs.filter(function (c) { return c.stage === 4; }).length;
     var nextF = FRIENDS.filter(function (f) { return pearls < f.at; })[0];
     var prevAt = unlocked.length ? unlocked[unlocked.length - 1].at : 0;
     var st = streak();
 
-    var wrap = E("section", { class: "sea-wrap", "aria-label": "Your sea world" });
+    var who = VIEW ? (VIEW.name || "Your child") + "'s" : "Your";
+    var wrap = E("section", { class: "sea-wrap" + (VIEW ? " sea-view" : ""), "aria-label": who + " sea world" });
     var chips = E("div", { class: "sea-chips" }, [
       E("span", { class: "sea-chip" }, [E("b", { text: commas(pearls) }), " pearls"]),
       E("span", { class: "sea-chip" }, [E("b", { text: kings + " of " + all.length }), " kings"]),
@@ -497,8 +506,8 @@
       ]) : E("span", { class: "sea-chip" }, ["All sea friends found! 🌊"])
     ]);
     var head = E("div", { class: "sea-head" }, [
-      E("div", {}, [E("h2", { text: "Your sea world" }),
-        E("p", { class: "sea-sub", text: "Start an exercise and its chapter hatches here: maths chapters are fish in the sea, science chapters are birds in the sky. Solve questions to feed them. Halfway, each one turns into a surprise animal, and bigger chapters grow into bigger animals. Tap one to meet it." })]),
+      E("div", {}, [E("h2", { text: who + " sea world" }),
+        E("p", { class: "sea-sub", text: VIEW ? "Each maths chapter is a fish and each science lesson is a bird. They grow as questions are solved, turn into a surprise animal at half way, and wear a crown when every question is done. Pearls are points. Tap an animal to see its chapter." : "Start an exercise and its chapter hatches here: maths chapters are fish in the sea, science chapters are birds in the sky. Solve questions to feed them. Halfway, each one turns into a surprise animal, and bigger chapters grow into bigger animals. Tap one to meet it." })]),
       chips
     ]);
     wrap.appendChild(head);
@@ -516,7 +525,7 @@
     var card = E("div", { class: "sea-card", hidden: "hidden" });
     box.appendChild(card);
     if (!chs.length) box.appendChild(E("div", { class: "sea-empty" }, [E("p", { class: "sea-empty-e", text: "🥚" }),
-      E("p", { text: "Your sea is waiting for its first friend." }), E("p", { class: "sea-empty-s", text: "Start any exercise and its chapter will hatch here." })]));
+      E("p", { text: VIEW ? "Nothing has hatched yet." : "Your sea is waiting for its first friend." }), E("p", { class: "sea-empty-s", text: VIEW ? "A chapter hatches here when the first question in it is tried." : "Start any exercise and its chapter will hatch here." })]));
     wrap.appendChild(box);
 
     // fish list for keyboard and screen readers
@@ -543,6 +552,7 @@
       else card.appendChild(E("p", { class: "sea-card-tier", text: TIER_WORD[c.tier] + " chapter (" + c.total + " questions)" + (c.tier ? ", so I grow extra big!" : "") }));
       card.appendChild(E("span", { class: "sea-meter" }, [E("span", { style: "width:" + Math.round(100 * c.p) + "%;background:" + c.col[0] })]));
       card.appendChild(E("p", { class: "sea-card-st", text: c.done + " of " + c.total + " questions solved · " + commas(c.points) + " pearls" }));
+      if (VIEW) { card.hidden = false; if (running) running.cheer(c); return; }
       var sayNext = c.stage + 1 === 2 ? " and you will see what I turn into!" : " and I become a " + stageName(c, c.stage + 1) + "!";
       card.appendChild(E("p", { class: "sea-card-say", text: need ? "Solve " + need + " more question" + (need === 1 ? "" : "s") + sayNext : (isBird(c) ? "I am the King of the sky!" : "I am the King of the sea!") + " Thank you for feeding me." }));
       if (nl) card.appendChild(E("button", { type: "button", class: "btn primary small", text: (need ? "Feed " + c.name + ": " : "Visit ") + nl.title + " →", onclick: function () { c.open(nl.id); } }));
@@ -639,11 +649,12 @@
       var k = Math.max(0.62, Math.min(1, W / 820));
       fish.forEach(function (o, i) {
         o.s = sizeOf(o.c.p, o.c.tier) * k * (o.bird ? 0.8 : 1);
+        var mx = Math.min(W / 2, Math.max(70, o.hw * o.s + 8));
         if (first) {
-          o.x = rnd(70, W - 70);
+          o.x = rnd(mx, W - mx);
           if (o.bird) o.ty = o.y = rnd(52, SKY - 30);
           else o.ty = o.y = clampY(o, SKY + 40 + (i % 5) * ((H - SAND - SKY - 90) / 4) + rnd(-10, 10));
-        } else { o.x = Math.min(Math.max(o.x, 70), W - 70); }
+        } else { o.x = Math.min(Math.max(o.x, mx), W - mx); }
       });
       draw(0);
     }
@@ -758,6 +769,15 @@
   }
 
   var api = { render: render, onSolve: onSolve, chapters: chapters };
+  // Parent page: draw a child's sea from their saved progress, read only.
+  // opts: { store: { key: value }, name: "Asha", stats: function (lesson, "Maths" | "Science") -> { done, total, points, tried } }
+  window.SeaView = {
+    render: function (opts) {
+      VIEW = { store: opts.store || {}, name: opts.name, stats: opts.stats || null };
+      try { return render(); } finally { VIEW = null; }
+    },
+    stop: function () { if (running) { running.stop(); running = null; } }
+  };
   if (P) P.aquarium = api;
   if (SC) SC.aquarium = api;
 })();

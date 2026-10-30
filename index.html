@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <link rel="stylesheet" href="aquarium.css">
+<link rel="stylesheet" href="cloud/cloud.css">
 <style>
 /* Layout: graph-paper desk; question card in the middle, exercise list beside it (stacks on phones). */
 :root {
@@ -40,6 +41,7 @@
 
 * { box-sizing: border-box; }
 body {
+  margin: 0;
   background: var(--paper);
   background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px);
   background-size: 24px 24px;
@@ -328,11 +330,13 @@ button { font: inherit; color: inherit; cursor: pointer; }
 </style>
 </head>
 <body>
-
 <nav class="site-nav" aria-label="Subjects"><a href="index.html" aria-current="page">📐 Maths</a><a href="science.html">🔬 Science</a></nav>
 <div id="app"></div>
 
 <!-- Engine first, then one script per lesson. Add new lessons here. -->
+<!-- Optional cloud save for parents (off until cloud/firebase-config.js has a config) -->
+<script src="cloud/firebase-config.js"></script>
+<script src="cloud/sync.js"></script>
 <script src="engine.js"></script>
 <script src="lessons/math-sets-g6-ex1-1.js"></script>
 <script src="lessons/math-sets-g6-ex1-2.js"></script>
@@ -388,5 +392,5 @@ button { font: inherit; color: inherit; cursor: pointer; }
 <script src="lessons/math-stats-g6-ex19-3.js"></script>
 <script src="aquarium.js"></script>
 <script>Practice.start(document.getElementById("app"));</script>
-</body>
-</html>
+
+</body></html>

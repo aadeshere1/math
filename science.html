@@ -8,6 +8,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700;800&family=Atkinson+Hyperlegible:wght@400;700&family=Noto+Sans+Devanagari:wght@500;700&display=swap">
 <link rel="stylesheet" href="shared.css">
 <link rel="stylesheet" href="aquarium.css">
+<link rel="stylesheet" href="cloud/cloud.css">
 <style>
 /* ---------- page ---------- */
 .site-nav { max-width: 1120px; margin: 0 auto; padding: 12px max(16px, env(safe-area-inset-right, 0px)) 0 max(16px, env(safe-area-inset-left, 0px)); display: flex; gap: 8px; }
@@ -224,15 +225,89 @@
   .spin, .pulse, .grow, .worm-move, .rain .drop, .acid-rain .drop, .wind-l, .draw, .puff, .sway, .plough, .card-emo, .flow-arr, .scene-big, .card-pic, .mind-i, .pouring .drip, .rain-fall.on .drop { animation: none !important; }
   .draw { stroke-dashoffset: 0; }
 }
+/* Space pictures (figures-space.js) */
+.sfig.space { background: #0b1734; }
+.sfig.space.mini { background: #13224a; border-radius: 10px; }
+.star { fill: #fff; opacity: .8; }
+.star.s1 { animation: twinkle 3s ease-in-out infinite; } .star.s2 { animation: twinkle 4.5s ease-in-out infinite -2s; }
+.orbit { fill: none; stroke: rgba(255,255,255,.22); stroke-width: 1; }
+.orbit.bright { stroke: rgba(255,255,255,.45); stroke-width: 1.5; }
+.orbit.dashed { stroke-dasharray: 6 5; }
+.moon-orbit { stroke-dasharray: 3 3; }
+.sun-body { fill: #ffc93c; } .sun-glow { opacity: 1; }
+.ring { fill: none; stroke: #cdb27a; stroke-width: 3; opacity: .9; }
+.rock-dot { fill: #a89f94; }
+.belt.hot .rock-dot { fill: #ffd27a; }
+.dim-some .orbit { stroke: rgba(255,255,255,.14); }
+.pl-hit { cursor: pointer; outline: none; } .pl-hit .hit { fill: transparent; }
+.pl-hit.sel .hit, .pl-hit:focus-visible .hit { stroke: #ffd23f; stroke-width: 2; }
+.sfig .lbl.inner { fill: #8fd3ff; } .sfig .lbl.outer { fill: #ffb27a; } .sfig .lbl.beltc { fill: #ffd27a; }
+.axis { stroke: #fff; stroke-width: 2; stroke-dasharray: 5 3; }
+.eq-line { stroke: #ffd23f; stroke-width: 1.4; opacity: .8; }
+.equator { fill: none; stroke: #ffd23f; stroke-width: 1.6; opacity: .8; }
+.upright { stroke: rgba(255,255,255,.55); stroke-width: 1.5; stroke-dasharray: 3 4; }
+.tilt-arc { fill: none; stroke: #ffd23f; stroke-width: 2; }
+.spin-arrow { fill: none; stroke: #ffd23f; stroke-width: 2; stroke-linecap: round; }
+.ray-line { stroke: #ffd23f; stroke-width: 2; stroke-dasharray: 10 8; opacity: .7; animation: flow 1s linear infinite; }
+.night { fill: #061028; opacity: .72; }
+.home-dot { fill: #ff5a5f; stroke: #fff; stroke-width: 2; }
+.season-e { cursor: pointer; outline: none; }
+.season-e .sel-ring { fill: none; stroke: transparent; stroke-width: 3; }
+.season-e.sel .sel-ring, .season-e:focus-visible .sel-ring { stroke: #ffd23f; }
+.wheel { background: #fffaf0; }
+.wseg { stroke: #fff; stroke-width: 2; cursor: pointer; outline: none; transition: filter .2s; }
+.wseg:hover { filter: brightness(1.06); }
+.wseg.sel, .wseg:focus-visible { stroke: #1b2a3a; stroke-width: 3; }
+.nop { pointer-events: none; }
+.wheel-mid { fill: #fff; stroke: #e6d9bf; stroke-width: 2; }
+.tick { stroke: #c9b9a0; stroke-width: 1.5; }
+.mountain { fill: #8a9a5b; }
+.sea-w { fill: #2f8fd6; }
+.wave-l { fill: none; stroke: #bfe6ff; stroke-width: 2; }
+.drift { animation: nudge 5s ease-in-out infinite; }
+.egg-shell { fill: #f3e2c7; stroke: #c9a46a; stroke-width: 3; }
+.egg-white { fill: #fffdf6; }
+.egg-yolk { fill: #ffb21f; }
+.egg-whole { fill: #f6e6cc; stroke: #c9a46a; stroke-width: 3; }
+.egg-cap { transition: transform 1.2s ease-in, opacity 1.2s; }
+.egg-cap.off { transform: translate(0, -240px) rotate(-25deg); opacity: 0; }
+.crust { fill: #7a5232; } .mantle { fill: #d9532b; } .core-o { fill: #f5a623; } .core-i { fill: #fff2a8; }
+.lay { cursor: pointer; outline: none; stroke: rgba(0,0,0,.25); stroke-width: 1; }
+.lay.crust { fill: #8a5a32; } .lay.mantle { fill: #d9532b; } .lay.core-o { fill: #f5a623; } .lay.core-i { fill: #fff2a8; }
+.lay.sel, .lay:focus-visible { stroke: #fff; stroke-width: 3; }
+.lead.light { stroke: rgba(255,255,255,.7); }
+.lead.dashed { stroke-dasharray: 4 3; }
+.comet-head { fill: #e8fbff; filter: drop-shadow(0 0 4px #9fe7ff); }
+.comet-tail { fill: #bfefff; } .comet-tail2 { fill: none; stroke: #ffe59a; stroke-width: 3; stroke-linecap: round; }
+.air-band { fill: #4aa8ff; opacity: .28; }
+.m-trail { stroke: rgba(255,210,120,.5); stroke-width: 3; stroke-dasharray: 6 6; fill: none; transition: opacity .4s; }
+.m-trail.faint { opacity: .2; }
+.m-glow { fill: transparent; } .m-rock.hot .m-glow { fill: #ff9a3d; opacity: .85; filter: drop-shadow(0 0 6px #ffcf5a); }
+.m-stone { fill: #6b6158; }
+.ash { opacity: 0; transition: opacity .5s; } .ash.show { opacity: 1; }
+.crater.boom { animation: pulse .3s ease-in-out 3; transform-box: fill-box; transform-origin: center; }
+.planet-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 230px), 1fr)); gap: 10px; width: 100%; }
+.planet-cards.small { grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); max-width: 440px; }
+.planet-card { display: grid; grid-template-columns: 90px 1fr; gap: 10px; align-items: center; text-align: left; background: var(--paper); border: 2px solid var(--line); border-radius: 14px; padding: 8px 10px; animation: rise .4s ease-out both; animation-delay: var(--d, 0s); color: inherit; }
+.planet-card:hover { border-color: var(--blue); }
+.pc-text { display: grid; gap: 1px; font-size: .9rem; }
+.pc-name { font-size: 1.05rem; } .pc-note { color: var(--ink-soft); font-size: .84rem; margin-top: 3px; }
+@keyframes twinkle { 50% { opacity: .25; } }
+@media (prefers-reduced-motion: reduce) { .star, .ray-line, .drift, .planet-card, .egg-cap, .crater.boom { animation: none !important; transition: none !important; } }
 </style>
 </head>
 <body>
 <nav class="site-nav" aria-label="Subjects"><a href="index.html">📐 Maths</a><a href="science.html" aria-current="page">🔬 Science</a></nav>
 <div id="app"></div>
+<!-- Optional cloud save for parents (off until cloud/firebase-config.js has a config) -->
+<script src="cloud/firebase-config.js"></script>
+<script src="cloud/sync.js"></script>
 <script src="shared.js"></script>
 <script src="science.js"></script>
 <script src="science/figures-earth.js"></script>
 <script src="science/soil-g6-11-1.js"></script>
+<script src="science/figures-space.js"></script>
+<script src="science/space-g6-11-2.js"></script>
 <script src="aquarium.js"></script>
 <script>Science.start(document.getElementById("app"));</script>
 </body>
